@@ -4,6 +4,7 @@
 #include "display.h"
 #include "lora.h"
 #include "accesspoint.h"
+#include "webserver.h"
 
 #define BUTTON_PIN 0
 
@@ -11,6 +12,7 @@ StopWatch stopWatch;
 Display dp;
 Lora lora;
 AccessPoint accessPoint;
+Webserver webserver;
 
 void IRAM_ATTR handleButtonPress() {
   stopWatch.trigger();
@@ -46,6 +48,7 @@ void setup() {
   dp.init();
   lora.init();
   accessPoint.init();
+  webserver.init();
 
   dp.setFont(ArialMT_Plain_10);
 }
