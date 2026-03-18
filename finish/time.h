@@ -14,8 +14,6 @@ class Time {
     Time();
     ~Time();
 
-    void start();
-    void reset();
     void trigger();
     String draw();
     

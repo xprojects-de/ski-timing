@@ -24,7 +24,6 @@ void setup() {
   delay(100);
 
   dp.init();
-  stopWatch.start();
 
   dp.setFont(ArialMT_Plain_10);
 

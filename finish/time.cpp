@@ -9,18 +9,16 @@ Time::Time() {
 
 Time::~Time() {}
 
-void Time::start() {
-    _startTime = millis();
-    _isRunning = true;
-}
-
-void Time::reset() {
-    _startTime = millis();
-}
-
 void Time::trigger() {
 
-    if (!_isRunning) return;
+    if (!_isRunning) {
+
+      _startTime = millis();
+      _isRunning = true;
+
+      return;
+
+    };
 
     unsigned long currentTime = millis();
     unsigned long elapsed = currentTime - _startTime;
