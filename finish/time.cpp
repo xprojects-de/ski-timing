@@ -1,8 +1,7 @@
 #include "time.h"
 
 // Konstruktor: Initialisiert die Werte
-Time::Time(unsigned long limit) {
-    _limitMS = limit;
+Time::Time() {
     _startTime = 0;
     _lastTime = 0;
     _isRunning = false;
@@ -19,17 +18,16 @@ void Time::reset() {
     _startTime = millis();
 }
 
-void Time::update() {
+void Time::trigger() {
 
     if (!_isRunning) return;
 
     unsigned long currentTime = millis();
     unsigned long elapsed = currentTime - _startTime;
 
-    if (elapsed >= _limitMS) {
-        _lastTime = elapsed;
-        _startTime = currentTime;
-    }
+    _lastTime = elapsed;
+    _startTime = currentTime;
+
 }
 
 String Time::formatTime(unsigned long ms) {

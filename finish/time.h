@@ -7,17 +7,16 @@ class Time {
 
   private:
     unsigned long _startTime;
-    unsigned long _limitMS;
     unsigned long _lastTime;
     bool _isRunning;
 
   public:
-    Time(unsigned long limit);
+    Time();
     ~Time();
 
     void start();
     void reset();
-    void update();
+    void trigger();
     String draw();
     
     static String formatTime(unsigned long ms);

@@ -3,8 +3,14 @@
 #include "time.h"
 #include "display.h"
 
-Time stopWatch(25000);
+#define BUTTON_PIN 0
+
+Time stopWatch;
 Display dp;
+
+void IRAM_ATTR handleButtonPress() {
+  stopWatch.trigger();
+}
 
 void setup() {
 
@@ -12,6 +18,9 @@ void setup() {
   Serial.println();
   Serial.println();
   VextON();
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
+
   delay(100);
 
   dp.init();
@@ -40,8 +49,6 @@ void loop() {
   dp.setTextAlignment(TEXT_ALIGN_LEFT);
   dp.setFont(ArialMT_Plain_16);
   dp.drawString(0, 0, "FINISH");
-  
-  stopWatch.update();
 
   dp.setTextAlignment(TEXT_ALIGN_CENTER);
   dp.setFont(ArialMT_Plain_16);    
