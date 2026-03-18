@@ -14,7 +14,8 @@ public:
 
   void init();
 
-  static esp_err_t get_data_handler(httpd_req_t* req);
+  static esp_err_t index_handler(httpd_req_t* req);
+  static esp_err_t data_handler(httpd_req_t* req);
 };
 
 #endif
