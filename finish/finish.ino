@@ -1,5 +1,5 @@
 // For a connection via I2C using the Arduino Wire include:
-#include <Wire.h>               
+#include <Wire.h>
 #include "stopwatch.h"
 #include "display.h"
 #include "lora.h"
@@ -18,12 +18,11 @@ void showChipId() {
 
   // Licence
   // https://resource.heltec.cn/search
-  uint64_t chipId=ESP.getEfuseMac();
+  uint64_t chipId = ESP.getEfuseMac();
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
-  Serial.printf("ESP32ChipID=%04X",(uint16_t)(chipId>>32));
-  Serial.printf("%08X\r\n",(uint32_t)chipId);
-
+  Serial.printf("ESP32ChipID=%04X", (uint16_t)(chipId >> 32));
+  Serial.printf("%08X\r\n", (uint32_t)chipId);
 }
 
 void setup() {
@@ -46,18 +45,16 @@ void setup() {
   lora.init();
 
   dp.setFont(ArialMT_Plain_10);
-
 }
 
-void VextON(void)
-{
-  pinMode(Vext,OUTPUT);
+void VextON(void) {
+  pinMode(Vext, OUTPUT);
   digitalWrite(Vext, LOW);
 }
 
-void VextOFF(void) //Vext default OFF
+void VextOFF(void)  //Vext default OFF
 {
-  pinMode(Vext,OUTPUT);
+  pinMode(Vext, OUTPUT);
   digitalWrite(Vext, HIGH);
 }
 
@@ -70,7 +67,7 @@ void loop() {
   dp.drawString(0, 0, "FINISH");
 
   dp.setTextAlignment(TEXT_ALIGN_CENTER);
-  dp.setFont(ArialMT_Plain_16);    
+  dp.setFont(ArialMT_Plain_16);
   String out = stopWatch.draw();
   dp.drawString(64, 25, out);
 
@@ -81,10 +78,9 @@ void loop() {
   dp.display();
 
   lora.proccess();
-  if(lora.receive() == true) {
+  if (lora.receive() == true) {
     stopWatch.trigger();
   }
 
   delay(10);
-
 }

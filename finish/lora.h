@@ -5,22 +5,21 @@
 
 class Lora {
 
-  private:
+private:
 
-  public:
-    Lora();
-    ~Lora();
+public:
+  Lora();
+  ~Lora();
 
-    void preInit();
-    void init();
-    void send();
-    bool receive();
-    void proccess();
+  void preInit();
+  void init();
+  void send();
+  bool receive();
+  void proccess();
 
-    static void OnTxDone();
-    static void OnTxTimeout();
-    static void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr);
-
+  static void OnTxDone();
+  static void OnTxTimeout();
+  static void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr);
 };
 
 #endif

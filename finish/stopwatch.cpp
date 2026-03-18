@@ -2,45 +2,42 @@
 
 // Konstruktor: Initialisiert die Werte
 StopWatch::StopWatch() {
-    _startTime = 0;
-    _lastTime = 0;
-    _isRunning = false;
+  _startTime = 0;
+  _lastTime = 0;
+  _isRunning = false;
 }
 
 StopWatch::~StopWatch() {}
 
 void StopWatch::trigger() {
 
-    if (!_isRunning) {
+  if (!_isRunning) {
 
-      _startTime = millis();
-      _isRunning = true;
+    _startTime = millis();
+    _isRunning = true;
 
-      return;
+    return;
+  };
 
-    };
+  unsigned long currentTime = millis();
+  unsigned long elapsed = currentTime - _startTime;
 
-    unsigned long currentTime = millis();
-    unsigned long elapsed = currentTime - _startTime;
-
-    _lastTime = elapsed;
-    _startTime = currentTime;
-
+  _lastTime = elapsed;
+  _startTime = currentTime;
 }
 
 String StopWatch::formatTime(unsigned long ms) {
 
-    int seconds = ms / 1000;
-    int hundredths = (ms % 1000) / 10;
-    String res = String(seconds) + ".";
-    if (hundredths < 10) res += "0";
-    res += String(hundredths);
+  int seconds = ms / 1000;
+  int hundredths = (ms % 1000) / 10;
+  String res = String(seconds) + ".";
+  if (hundredths < 10) res += "0";
+  res += String(hundredths);
 
-    return res;
-
+  return res;
 }
 
 String StopWatch::draw() {
-    unsigned long currentElapsed = _isRunning ? (millis() - _startTime) : 0;    
-    return formatTime(_lastTime) + " / " + formatTime(currentElapsed);
+  unsigned long currentElapsed = _isRunning ? (millis() - _startTime) : 0;
+  return formatTime(_lastTime) + " / " + formatTime(currentElapsed);
 }

@@ -5,20 +5,19 @@
 
 class StopWatch {
 
-  private:
-    unsigned long _startTime;
-    unsigned long _lastTime;
-    bool _isRunning;
+private:
+  unsigned long _startTime;
+  unsigned long _lastTime;
+  bool _isRunning;
 
-  public:
-    StopWatch();
-    ~StopWatch();
+public:
+  StopWatch();
+  ~StopWatch();
 
-    void trigger();
-    String draw();
-    
-    static String formatTime(unsigned long ms);
+  void trigger();
+  String draw();
 
+  static String formatTime(unsigned long ms);
 };
 
 #endif
