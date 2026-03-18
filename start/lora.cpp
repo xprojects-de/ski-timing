@@ -1,15 +1,15 @@
 #include "lora.h"
 
-#define RF_FREQUENCY 865000000  // Hz
+#define RF_FREQUENCY 868100000  // Hz
 
-#define TX_OUTPUT_POWER 5  // dBm
+#define TX_OUTPUT_POWER 14  // dBm
 
 #define LORA_BANDWIDTH 0         // [0: 125 kHz, \
                                  //  1: 250 kHz, \
                                  //  2: 500 kHz, \
                                  //  3: Reserved]
-#define LORA_SPREADING_FACTOR 7  // [SF7..SF12]
-#define LORA_CODINGRATE 1        // [1: 4/5, \
+#define LORA_SPREADING_FACTOR 10  // [SF7..SF12]
+#define LORA_CODINGRATE 4        // [1: 4/5, \
                                  //  2: 4/6, \
                                  //  3: 4/7, \
                                  //  4: 4/8]
@@ -21,6 +21,8 @@
 
 #define RX_TIMEOUT_VALUE 1000
 #define BUFFER_SIZE 30  // Define the payload size here
+
+// #define LORA_SYNCWORD 0x19
 
 char txpacket[BUFFER_SIZE];
 char rxpacket[BUFFER_SIZE];
@@ -51,6 +53,10 @@ void Lora::init() {
   RadioEvents.RxDone = Lora::OnRxDone;
 
   Radio.Init(&RadioEvents);
+
+  Radio.SetPublicNetwork(false);
+  // Radio.SetSyncWord(LORA_SYNCWORD);
+
   Radio.SetChannel(RF_FREQUENCY);
   Radio.SetTxConfig(MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
                     LORA_SPREADING_FACTOR, LORA_CODINGRATE,
