@@ -14,7 +14,7 @@ class Lora {
     void preInit();
     void init();
     void send();
-    void receive();
+    bool receive();
     void proccess();
 
     static void OnTxDone();

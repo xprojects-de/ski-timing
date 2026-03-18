@@ -32,6 +32,8 @@ bool sendTrigger = false;
 bool lora_idle = true;
 int16_t rssi,rxSize;
 
+bool recvTrigger = false;
+
 Lora::Lora() {
 }
 
@@ -77,8 +79,15 @@ void Lora::send() {
 
 }
 
-void Lora::receive() {
+bool Lora::receive() {
+    
+    bool sRecvTrigger = recvTrigger;
 
+    if(recvTrigger == true) {
+      recvTrigger = false;
+    }
+
+    return sRecvTrigger;
 }
 
 void Lora::proccess() {
@@ -124,5 +133,6 @@ void Lora::OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
     Serial.println("wait to send next packet");
 
     lora_idle = true;
+    recvTrigger = true;
 }
 

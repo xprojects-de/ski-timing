@@ -1,15 +1,15 @@
-#include "time.h"
+#include "stopwatch.h"
 
 // Konstruktor: Initialisiert die Werte
-Time::Time() {
+StopWatch::StopWatch() {
     _startTime = 0;
     _lastTime = 0;
     _isRunning = false;
 }
 
-Time::~Time() {}
+StopWatch::~StopWatch() {}
 
-void Time::trigger() {
+void StopWatch::trigger() {
 
     if (!_isRunning) {
 
@@ -28,7 +28,7 @@ void Time::trigger() {
 
 }
 
-String Time::formatTime(unsigned long ms) {
+String StopWatch::formatTime(unsigned long ms) {
 
     int seconds = ms / 1000;
     int hundredths = (ms % 1000) / 10;
@@ -40,7 +40,7 @@ String Time::formatTime(unsigned long ms) {
 
 }
 
-String Time::draw() {
+String StopWatch::draw() {
     unsigned long currentElapsed = _isRunning ? (millis() - _startTime) : 0;    
     return formatTime(_lastTime) + " / " + formatTime(currentElapsed);
 }

@@ -1,14 +1,14 @@
 // For a connection via I2C using the Arduino Wire include:
 #include <Wire.h>               
-#include "time.h"
+#include "stopwatch.h"
 #include "display.h"
-// #include "lora.h"
+#include "lora.h"
 
 #define BUTTON_PIN 0
 
-Time stopWatch;
+StopWatch stopWatch;
 Display dp;
-// Lora lora;
+Lora lora;
 
 void IRAM_ATTR handleButtonPress() {
   stopWatch.trigger();
@@ -34,7 +34,7 @@ void setup() {
 
   showChipId();
 
-  // lora.preInit();
+  lora.preInit();
 
   VextON();
   pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -43,7 +43,7 @@ void setup() {
   delay(100);
 
   dp.init();
-  // lora.init();
+  lora.init();
 
   dp.setFont(ArialMT_Plain_10);
 
@@ -80,7 +80,10 @@ void loop() {
 
   dp.display();
 
-  // lora.proccess();
+  lora.proccess();
+  if(lora.receive() == true) {
+    stopWatch.trigger();
+  }
 
   delay(10);
 

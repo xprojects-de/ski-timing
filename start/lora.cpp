@@ -85,13 +85,10 @@ void Lora::proccess() {
 
   if(lora_idle == true) {
 
-    lora_idle = false;
-
     if(sendTrigger == true) {
       Radio.Send( (uint8_t *)txpacket, strlen(txpacket) );
-    } else {
-      Radio.Rx(0);
-    }   
+      lora_idle = false;
+    } 
 
   }
 

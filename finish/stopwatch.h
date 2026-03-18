@@ -3,7 +3,7 @@
 
 #include <Wire.h>
 
-class Time {
+class StopWatch {
 
   private:
     unsigned long _startTime;
@@ -11,8 +11,8 @@ class Time {
     bool _isRunning;
 
   public:
-    Time();
-    ~Time();
+    StopWatch();
+    ~StopWatch();
 
     void trigger();
     String draw();
