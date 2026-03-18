@@ -3,12 +3,14 @@
 #include "stopwatch.h"
 #include "display.h"
 #include "lora.h"
+#include "accesspoint.h"
 
 #define BUTTON_PIN 0
 
 StopWatch stopWatch;
 Display dp;
 Lora lora;
+AccessPoint accessPoint;
 
 void IRAM_ATTR handleButtonPress() {
   stopWatch.trigger();
@@ -43,6 +45,7 @@ void setup() {
 
   dp.init();
   lora.init();
+  accessPoint.init();
 
   dp.setFont(ArialMT_Plain_10);
 }
