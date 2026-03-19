@@ -4,7 +4,6 @@
 #include <Arduino.h>
 #include "website.h"
 
-// Konstruktor: Initialisiert die Werte
 Webserver::Webserver() {
 }
 
@@ -18,16 +17,36 @@ esp_err_t Webserver::index_handler(httpd_req_t* req) {
 
 esp_err_t Webserver::data_handler(httpd_req_t* req) {
 
-  int luckyNumber = random(10, 100);
+  Fs* myFs = (Fs*)req->user_ctx;
 
-  char resp[100];
-  snprintf(resp, sizeof(resp), "%d,10.80\n2,10.90\n3,%d", luckyNumber);
+  if (myFs == NULL) {
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No FS Instance");
+    return ESP_FAIL;
+  }
 
-  httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
+  String allData = myFs->readAll();
+
+  httpd_resp_set_type(req, "text/plain");
+
+  httpd_resp_send(req, allData.c_str(), HTTPD_RESP_USE_STRLEN);
+
+  Serial.println("Data send using readAll().");
   return ESP_OK;
 }
 
-void Webserver::init() {
+esp_err_t Webserver::reset_handler(httpd_req_t* req) {
+
+  Fs* myFs = (Fs*)req->user_ctx;
+
+  if (myFs != NULL && myFs->clear()) {
+    httpd_resp_send(req, "Data deleted. <a href='/'>Back</a>", HTTPD_RESP_USE_STRLEN);
+  } else {
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Error");
+  }
+  return ESP_OK;
+}
+
+void Webserver::init(Fs* fs_instance) {
 
   httpd_handle_t server = NULL;
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -46,10 +65,18 @@ void Webserver::init() {
       .uri = "/data",
       .method = HTTP_GET,
       .handler = Webserver::data_handler,
-      .user_ctx = NULL
+      .user_ctx = fs_instance
     };
     httpd_register_uri_handler(server, &uri_data);
 
-    Serial.println("Webserver gestartet!");
+    httpd_uri_t uri_reset = {
+      .uri = "/reset",
+      .method = HTTP_GET,
+      .handler = Webserver::reset_handler,
+      .user_ctx = fs_instance
+    };
+    httpd_register_uri_handler(server, &uri_reset);
+
+    Serial.println("Webserver started!");
   }
 }

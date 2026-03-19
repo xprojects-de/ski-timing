@@ -5,6 +5,7 @@
 #include "lora.h"
 #include "accesspoint.h"
 #include "webserver.h"
+#include "fs.h"
 
 #define BUTTON_PIN 0
 
@@ -13,9 +14,12 @@ Display dp;
 Lora lora;
 AccessPoint accessPoint;
 Webserver webserver;
+Fs fs;
+
+volatile bool buttonTriggered = false;
 
 void IRAM_ATTR handleButtonPress() {
-  stopWatch.trigger();
+  buttonTriggered = true;
 }
 
 void showChipId() {
@@ -48,7 +52,8 @@ void setup() {
   dp.init();
   lora.init();
   accessPoint.init();
-  webserver.init();
+  fs.init();
+  webserver.init(&fs);
 
   dp.setFont(ArialMT_Plain_10);
 }
@@ -83,9 +88,14 @@ void loop() {
 
   dp.display();
 
+  if (buttonTriggered == true) {
+    buttonTriggered = false;
+    stopWatch.trigger(&fs);
+  }
+
   lora.proccess();
   if (lora.receive() == true) {
-    stopWatch.trigger();
+    stopWatch.trigger(&fs);
   }
 
   delay(10);

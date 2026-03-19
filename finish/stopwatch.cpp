@@ -9,7 +9,7 @@ StopWatch::StopWatch() {
 
 StopWatch::~StopWatch() {}
 
-void StopWatch::trigger() {
+void StopWatch::trigger(Fs* fs_instance) {
 
   if (!_isRunning) {
 
@@ -24,6 +24,9 @@ void StopWatch::trigger() {
 
   _lastTime = elapsed;
   _startTime = currentTime;
+
+  fs_instance->append(_lastTime);
+
 }
 
 String StopWatch::formatTime(unsigned long ms) {

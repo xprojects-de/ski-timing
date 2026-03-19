@@ -2,6 +2,7 @@
 #define TIME_H
 
 #include <Wire.h>
+#include "fs.h"
 
 class StopWatch {
 
@@ -14,7 +15,7 @@ public:
   StopWatch();
   ~StopWatch();
 
-  void trigger();
+  void trigger(Fs* fs_instance);
   String draw();
 
   static String formatTime(unsigned long ms);

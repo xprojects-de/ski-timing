@@ -3,6 +3,7 @@
 
 #include <esp_err.h>
 #include <esp_http_server.h>
+#include "fs.h"
 
 class Webserver {
 
@@ -12,10 +13,11 @@ public:
   Webserver();
   ~Webserver();
 
-  void init();
+  void init(Fs *fs_instance);
 
   static esp_err_t index_handler(httpd_req_t* req);
   static esp_err_t data_handler(httpd_req_t* req);
+  static esp_err_t reset_handler(httpd_req_t *req);
 };
 
 #endif

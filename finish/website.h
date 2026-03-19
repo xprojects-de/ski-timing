@@ -12,23 +12,22 @@ const char index_html[] PROGMEM = R"rawliteral(
     </style>
 </head>
 <body>
-    <h1>Ski Zeitnahme</h1>
-    <table class="tabelle" id="ergebnisse">
-        <tr><th>Nr</th><th>Zeit (s)</th></tr>
+    <h1>Ski Timming</h1>
+    <table class="tabelle" id="results">
+        <tr><th>Nr.</th><th>Time (s)</th></tr>
     </table>
     <script>
-        // Funktion zum Laden der Zeiten
         setInterval(function() {
           fetch('/data').then(response => response.text()).then(csv => {
-            let rows = csv.split('\n');
-            let table = "<tr><th>Nr</th><th>Zeit (s)</th></tr>";
-            rows.forEach((row, index) => {
-              if(row.trim().length > 0) {
-                let cols = row.split(',');
-                table += "<tr><td>" + (index+1) + "</td><td>" + cols[1] + "</td></tr>";
+            let rows = csv.trim().split('\n');
+            let table = "<tr><th>Nr</th><th>Zeit (s)</th></tr>";            
+            rows.forEach((time, index) => {
+              if(time.length > 0) {
+                let newRow = "<tr><td>" + (index + 1) + "</td><td>" + time + " s</td></tr>";
+                table = "<tr><th>Nr.</th><th>Time (s)</th></tr>" + newRow + table.replace("<tr><th>Nr</th><th>Zeit (s)</th></tr>", "");
               }
             });
-            document.getElementById('ergebnisse').innerHTML = table;
+            document.getElementById('results').innerHTML = table;
           });
         }, 2000);
     </script>

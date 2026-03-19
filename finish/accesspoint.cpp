@@ -7,7 +7,6 @@
 #include "nvs_flash.h"
 #include "esp_netif.h"
 
-// Konstruktor: Initialisiert die Werte
 AccessPoint::AccessPoint() {
 }
 
@@ -50,7 +49,7 @@ void AccessPoint::init() {
   if (netif) {
     esp_netif_get_ip_info(netif, &ip_info);
 
-    Serial.print("Access Point gestartet. SSID: ");
+    Serial.print("Access Point started. SSID: ");
     Serial.println((char*)wifi_config.ap.ssid);
 
     Serial.print("IP-Adresse: ");
