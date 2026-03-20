@@ -21,6 +21,7 @@ int64_t totalOffset = 0;
 int timeSyncReceived = 0;
 int64_t finalAverageOffset = 0;
 bool isTimeSynced = false;
+uint64_t lastRemoteTime = 0;
 
 volatile bool buttonTriggered = false;
 
@@ -80,6 +81,17 @@ void VextOFF(void)  //Vext default OFF
 }
 
 void syncTime(uint64_t remoteTime) {
+
+  if (remoteTime < lastRemoteTime) {
+
+    Serial.println("Sender Reset erkannt! Starte Sync neu...");
+
+    timeSyncReceived = 0;
+    totalOffset = 0;
+    isTimeSynced = false;
+  }
+
+  lastRemoteTime = remoteTime;
 
   if (timeSyncReceived >= TIMESYNC_COUNT) {
     return;
