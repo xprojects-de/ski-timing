@@ -55,6 +55,17 @@ String StopWatch::formatTime(int64_t ms) {
 }
 
 String StopWatch::draw() {
-  unsigned long currentElapsed = _isRunning ? ((getSyncedMicros() - _startTime) / 1000) : 0;
+
+  int64_t currentElapsed = 0;
+
+  if (_isRunning) {
+    int64_t currentTime = getSyncedMicros();
+    if (currentTime > _startTime) {
+      currentElapsed = (currentTime - _startTime) / 1000;
+    } else {
+      currentElapsed = 0;
+    }
+  }
+
   return formatTime(_lastTime) + " / " + formatTime(currentElapsed);
 }
