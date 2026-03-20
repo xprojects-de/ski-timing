@@ -8,11 +8,12 @@
 Display dp;
 Lora lora;
 
-unsigned long currentMillis = 0;
+volatile bool buttonTriggered = false;
+char timeTrigger[30];
 
 void IRAM_ATTR handleButtonPress() {
-  currentMillis = millis();
-  lora.send();
+  snprintf(timeTrigger, sizeof(timeTrigger), "%lu", micros());
+  buttonTriggered = true;
 }
 
 void showChipId() {
@@ -46,6 +47,8 @@ void setup() {
   dp.init();
   lora.init();
 
+  snprintf(timeTrigger, sizeof(timeTrigger), "-");
+
   dp.setFont(ArialMT_Plain_10);
 }
 
@@ -69,9 +72,15 @@ void loop() {
 
   dp.setTextAlignment(TEXT_ALIGN_CENTER);
   dp.setFont(ArialMT_Plain_16);
-  dp.drawString(64, 25, String(currentMillis));
+  dp.drawString(64, 25, String(timeTrigger));
 
   dp.display();
+
+  if (buttonTriggered == true) {
+
+    buttonTriggered = false;
+    lora.sendData(timeTrigger);
+  }
 
   lora.proccess();
 

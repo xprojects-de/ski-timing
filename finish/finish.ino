@@ -94,7 +94,22 @@ void loop() {
   }
 
   lora.proccess();
-  if (lora.receive() == true) {
+  if (lora.available() == true) {
+
+    char msg[64];
+    int16_t len, rssi;
+    int8_t snr;
+
+    lora.getPacket(msg, len, rssi, snr);
+
+    Serial.printf("Empfangen: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
+
+    String message = String(msg);
+
+    // if (message.startsWith("PING")) {
+    //   lora.sendData("PONG");
+    // }
+
     stopWatch.trigger(&fs);
   }
 

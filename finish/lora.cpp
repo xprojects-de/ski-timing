@@ -20,24 +20,26 @@
 
 
 #define RX_TIMEOUT_VALUE 1000
-#define BUFFER_SIZE 30  // Define the payload size here
+#define BUFFER_SIZE 30
+
+#define LORA_PREFIX "ST-"
+#define PREFIX_LEN 3
 
 // #define LORA_SYNCWORD 0x19
 
-char txpacket[BUFFER_SIZE];
-char rxpacket[BUFFER_SIZE];
-
 static RadioEvents_t RadioEvents;
 
-int16_t txNumber;
-bool sendTrigger = false;
-bool lora_idle = true;
-int16_t rssi, rxSize;
+char _rxBuffer[BUFFER_SIZE];
+char _txBuffer[BUFFER_SIZE];
+int16_t _rxSize = 0;
+int16_t _lastRssi = 0;
+int8_t _lastSnr = 0;
 
-bool recvTrigger = false;
+bool _sendRequested = false;
+bool _packetReceived = false;
+bool _radioBusy = false;
 
-Lora::Lora() {
-}
+Lora::Lora() {}
 
 Lora::~Lora() {}
 
@@ -47,12 +49,11 @@ void Lora::preInit() {
 
 void Lora::init() {
 
-  txNumber = 0;
-  rssi = 0;
-
   RadioEvents.TxDone = Lora::OnTxDone;
   RadioEvents.TxTimeout = Lora::OnTxTimeout;
   RadioEvents.RxDone = Lora::OnRxDone;
+  RadioEvents.RxTimeout = Lora::OnRxTimeout;
+  RadioEvents.RxError = Lora::OnRxError;
 
   Radio.Init(&RadioEvents);
 
@@ -70,67 +71,86 @@ void Lora::init() {
                     LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
                     LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
                     0, true, 0, 0, LORA_IQ_INVERSION_ON, true);
+
+  _radioBusy = false;
 }
 
-void Lora::send() {
+void Lora::sendData(const char *data) {
 
-  if (sendTrigger == false) {
-
-    txNumber += 1;
-    sprintf(txpacket, "Hello world number %d", txNumber);
-
-    sendTrigger = true;
+  if (!_radioBusy) {
+    snprintf(_txBuffer, BUFFER_SIZE, "%s%s", LORA_PREFIX, data);
+    _sendRequested = true;
   }
 }
 
-bool Lora::receive() {
+bool Lora::available() {
+  return _packetReceived;
+}
 
-  bool sRecvTrigger = recvTrigger;
+void Lora::getPacket(char *buffer, int16_t &size, int16_t &rssi, int8_t &snr) {
 
-  if (recvTrigger == true) {
-    recvTrigger = false;
+  if (_packetReceived) {
+
+    memcpy(buffer, _rxBuffer, _rxSize);
+    buffer[_rxSize] = '\0';
+    size = _rxSize;
+    rssi = _lastRssi;
+    snr = _lastSnr;
+    _packetReceived = false;
   }
-
-  return sRecvTrigger;
 }
 
 void Lora::proccess() {
 
-  if (lora_idle == true) {
+  if (!_radioBusy) {
 
-    lora_idle = false;
+    if (_sendRequested) {
 
-    if (sendTrigger == true) {
-      Radio.Send((uint8_t *)txpacket, strlen(txpacket));
+      _radioBusy = true;
+      _sendRequested = false;
+      Radio.Send((uint8_t *)_txBuffer, strlen(_txBuffer));
+
     } else {
       Radio.Rx(0);
     }
   }
-
   Radio.IrqProcess();
 }
 
 void Lora::OnTxDone() {
-  lora_idle = true;
-  sendTrigger = false;
+  _radioBusy = false;
 }
 
 void Lora::OnTxTimeout() {
-  Radio.Sleep();
-  lora_idle = true;
-  sendTrigger = false;
+  //Radio.Sleep();
+  _radioBusy = false;
 }
 
 void Lora::OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
-  rssi = rssi;
-  rxSize = size;
-  memcpy(rxpacket, payload, size);
-  rxpacket[size] = '\0';
-  Radio.Sleep();
 
-  Serial.printf("\r\nreceived packet \"%s\" with Rssi %d , length %d\r\n", rxpacket, rssi, rxSize);
-  Serial.println("wait to send next packet");
+  if (size >= PREFIX_LEN && memcmp(payload, LORA_PREFIX, PREFIX_LEN) == 0) {
 
-  lora_idle = true;
-  recvTrigger = true;
+    uint16_t actualDataSize = size - PREFIX_LEN;
+    _rxSize = (actualDataSize < BUFFER_SIZE) ? actualDataSize : (BUFFER_SIZE - 1);
+
+    memcpy(_rxBuffer, payload + PREFIX_LEN, _rxSize);
+    _rxBuffer[_rxSize] = '\0';
+
+    _lastRssi = rssi;
+    _lastSnr = snr;
+    _packetReceived = true;
+  } else {
+    _packetReceived = false;
+  }
+
+  _radioBusy = false;
+  // Radio.Sleep();
+}
+
+void Lora::OnRxTimeout() {
+  _radioBusy = false;
+}
+
+void Lora::OnRxError() {
+  _radioBusy = false;
 }
