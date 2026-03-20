@@ -8,6 +8,7 @@
 #include "fs.h"
 
 #define BUTTON_PIN 0
+#define TIMESYNC_COUNT 3
 
 StopWatch stopWatch;
 Display dp;
@@ -16,7 +17,15 @@ AccessPoint accessPoint;
 Webserver webserver;
 Fs fs;
 
+uint64_t totalOffset = 0;
+int timeSyncReceived = 0;
+uint64_t finalAverageOffset = 0;
+
 volatile bool buttonTriggered = false;
+
+char msg[64];
+int16_t len, rssi;
+int8_t snr;
 
 void IRAM_ATTR handleButtonPress() {
   buttonTriggered = true;
@@ -69,6 +78,24 @@ void VextOFF(void)  //Vext default OFF
   digitalWrite(Vext, HIGH);
 }
 
+void syncTime(uint64_t remoteTime) {
+
+  uint64_t localTime = micros();
+  uint64_t offset = (uint64_t)(remoteTime - localTime);
+  totalOffset += offset;
+  timeSyncReceived++;
+
+  Serial.printf("Times local/remote %lld/%lld us\n", localTime, remoteTime);
+  Serial.printf("Sync %d/%d: Diff = %lld us\n", timeSyncReceived, TIMESYNC_COUNT, offset);
+
+  if (timeSyncReceived == TIMESYNC_COUNT) {
+
+    finalAverageOffset = totalOffset / TIMESYNC_COUNT;
+    stopWatch.setOffset(finalAverageOffset);
+    Serial.printf("Avarage-Offset: %lld us\n", finalAverageOffset);
+  }
+}
+
 void loop() {
 
   dp.clear();
@@ -90,27 +117,23 @@ void loop() {
 
   if (buttonTriggered == true) {
     buttonTriggered = false;
-    stopWatch.trigger(&fs);
+    stopWatch.triggerFinish(&fs);
   }
 
   lora.proccess();
-  if (lora.available() == true) {
 
-    char msg[64];
-    int16_t len, rssi;
-    int8_t snr;
+  if (lora.available() == true) {
 
     lora.getPacket(msg, len, rssi, snr);
 
-    Serial.printf("Empfangen: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
+    Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
 
-    String message = String(msg);
-
-    // if (message.startsWith("PING")) {
-    //   lora.sendData("PONG");
-    // }
-
-    stopWatch.trigger(&fs);
+    if (timeSyncReceived < TIMESYNC_COUNT) {
+      syncTime(atoll(msg));
+      // lora.sendData("SYNC");
+    } else {
+      stopWatch.triggerStart(atoll(msg));
+    }
   }
 
   delay(10);

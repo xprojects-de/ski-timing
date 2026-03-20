@@ -7,15 +7,19 @@
 class StopWatch {
 
 private:
-  unsigned long _startTime;
-  unsigned long _lastTime;
+  uint64_t _startTime;
+  uint64_t _lastTime;
   bool _isRunning;
+  uint64_t _offset;
 
 public:
   StopWatch();
   ~StopWatch();
 
-  void trigger(Fs* fs_instance);
+  void setOffset(uint64_t offset);
+  uint64_t getSyncedMicros();
+  void triggerStart(uint64_t time);
+  void triggerFinish(Fs* fs_instance);
   String draw();
 
   static String formatTime(unsigned long ms);
