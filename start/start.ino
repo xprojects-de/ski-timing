@@ -4,12 +4,15 @@
 #include "lora.h"
 
 #define BUTTON_PIN 0
+#define SYNC_INTERVAL_MS 5000
 
 Display dp;
 Lora lora;
 
 volatile bool buttonTriggered = false;
 char timeTrigger[30];
+unsigned long lastSyncTime = -5000;
+char syncMsg[32];
 
 void IRAM_ATTR handleButtonPress() {
   snprintf(timeTrigger, sizeof(timeTrigger), "%lu", micros());
@@ -74,15 +77,29 @@ void loop() {
   dp.setFont(ArialMT_Plain_16);
   dp.drawString(64, 25, String(timeTrigger));
 
+  dp.setTextAlignment(TEXT_ALIGN_LEFT);
+  dp.setFont(ArialMT_Plain_10);
+  dp.drawString(0, 54, "UpTime: " + String(millis() / 1000) + "s");
+
   dp.display();
 
   if (buttonTriggered == true) {
 
     buttonTriggered = false;
     lora.sendData(timeTrigger);
+    delay(5);
+  }
+
+  if (millis() - lastSyncTime >= SYNC_INTERVAL_MS) {
+    lastSyncTime = millis();
+
+    snprintf(syncMsg, sizeof(syncMsg), "sync:%llu", (uint64_t)micros());
+    lora.sendData(syncMsg);
+    Serial.printf("send sync: %s\n", syncMsg);
+    delay(5);
   }
 
   lora.proccess();
 
-  delay(10);
+  delay(5);
 }

@@ -8,7 +8,7 @@
 #include "fs.h"
 
 #define BUTTON_PIN 0
-#define TIMESYNC_COUNT 3
+#define TIMESYNC_COUNT 5
 
 StopWatch stopWatch;
 Display dp;
@@ -81,6 +81,10 @@ void VextOFF(void)  //Vext default OFF
 
 void syncTime(uint64_t remoteTime) {
 
+  if (timeSyncReceived >= TIMESYNC_COUNT) {
+    return;
+  }
+
   int64_t localTime = micros();
   int64_t offset = (int64_t)(remoteTime - localTime);
   totalOffset += offset;
@@ -134,11 +138,12 @@ void loop() {
 
     Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
 
-    if (timeSyncReceived < TIMESYNC_COUNT) {
-      syncTime(atoll(msg));
-      // lora.sendData("SYNC");
+    if (strncmp(msg, "sync:", 5) == 0) {
+      syncTime(atoll(&msg[5]));
     } else {
-      stopWatch.triggerStart(atoll(msg));
+      if (isTimeSynced) {
+        stopWatch.triggerStart(atoll(msg));
+      }
     }
   }
 
