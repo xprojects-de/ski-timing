@@ -6,9 +6,9 @@
 #include "accesspoint.h"
 #include "webserver.h"
 #include "fs.h"
+#include "timesync.h"
 
 #define BUTTON_PIN 0
-#define TIMESYNC_COUNT 5
 
 StopWatch stopWatch;
 Display dp;
@@ -16,12 +16,7 @@ Lora lora;
 AccessPoint accessPoint;
 Webserver webserver;
 Fs fs;
-
-int64_t totalOffset = 0;
-int timeSyncReceived = 0;
-int64_t finalAverageOffset = 0;
-bool isTimeSynced = false;
-uint64_t lastRemoteTime = 0;
+Timesync timeSync;
 
 volatile bool buttonTriggered = false;
 
@@ -80,40 +75,6 @@ void VextOFF(void)  //Vext default OFF
   digitalWrite(Vext, HIGH);
 }
 
-void syncTime(uint64_t remoteTime) {
-
-  if (remoteTime < lastRemoteTime) {
-
-    Serial.println("Sender Reset erkannt! Starte Sync neu...");
-
-    timeSyncReceived = 0;
-    totalOffset = 0;
-    isTimeSynced = false;
-  }
-
-  lastRemoteTime = remoteTime;
-
-  if (timeSyncReceived >= TIMESYNC_COUNT) {
-    return;
-  }
-
-  int64_t localTime = micros();
-  int64_t offset = (int64_t)(remoteTime - localTime);
-  totalOffset += offset;
-  timeSyncReceived++;
-
-  Serial.printf("Times local/remote %lld/%lld us\n", localTime, remoteTime);
-  Serial.printf("Sync %d/%d: Diff = %lld us\n", timeSyncReceived, TIMESYNC_COUNT, offset);
-
-  if (timeSyncReceived == TIMESYNC_COUNT) {
-
-    finalAverageOffset = totalOffset / TIMESYNC_COUNT;
-    stopWatch.setOffset(finalAverageOffset);
-    Serial.printf("Avarage-Offset: %lld us\n", finalAverageOffset);
-    isTimeSynced = true;
-  }
-}
-
 void loop() {
 
   dp.clear();
@@ -129,7 +90,7 @@ void loop() {
   dp.setTextAlignment(TEXT_ALIGN_LEFT);
   dp.setFont(ArialMT_Plain_10);
 
-  if (isTimeSynced) {
+  if (timeSync.isInit()) {
     dp.drawString(0, 54, "synced - UpTime: " + String(millis() / 1000) + "s");
   } else {
     dp.drawString(0, 54, "UpTime: " + String(millis() / 1000) + "s");
@@ -151,9 +112,9 @@ void loop() {
     Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
 
     if (strncmp(msg, "sync:", 5) == 0) {
-      syncTime(atoll(&msg[5]));
+      timeSync.syncTime(atoll(&msg[5]), &stopWatch);
     } else {
-      if (isTimeSynced) {
+      if (timeSync.isInit()) {
         stopWatch.triggerStart(atoll(msg));
       }
     }
