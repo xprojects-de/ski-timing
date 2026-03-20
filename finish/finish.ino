@@ -20,6 +20,7 @@ Fs fs;
 int64_t totalOffset = 0;
 int timeSyncReceived = 0;
 int64_t finalAverageOffset = 0;
+bool isTimeSynced = false;
 
 volatile bool buttonTriggered = false;
 
@@ -93,6 +94,7 @@ void syncTime(uint64_t remoteTime) {
     finalAverageOffset = totalOffset / TIMESYNC_COUNT;
     stopWatch.setOffset(finalAverageOffset);
     Serial.printf("Avarage-Offset: %lld us\n", finalAverageOffset);
+    isTimeSynced = true;
   }
 }
 
@@ -106,12 +108,16 @@ void loop() {
 
   dp.setTextAlignment(TEXT_ALIGN_CENTER);
   dp.setFont(ArialMT_Plain_16);
-  String out = stopWatch.draw();
-  dp.drawString(64, 25, out);
+  dp.drawString(64, 25, stopWatch.draw());
 
-  dp.setTextAlignment(TEXT_ALIGN_RIGHT);
+  dp.setTextAlignment(TEXT_ALIGN_LEFT);
   dp.setFont(ArialMT_Plain_10);
-  dp.drawString(127, 54, String(millis() / 1000) + "s");
+
+  if (isTimeSynced) {
+    dp.drawString(0, 54, "synced - UpTime: " + String(millis() / 1000) + "s");
+  } else {
+    dp.drawString(0, 54, "UpTime: " + String(millis() / 1000) + "s");
+  }
 
   dp.display();
 
@@ -136,5 +142,5 @@ void loop() {
     }
   }
 
-  delay(10);
+  delay(5);
 }
