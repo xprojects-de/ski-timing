@@ -17,9 +17,9 @@ AccessPoint accessPoint;
 Webserver webserver;
 Fs fs;
 
-uint64_t totalOffset = 0;
+int64_t totalOffset = 0;
 int timeSyncReceived = 0;
-uint64_t finalAverageOffset = 0;
+int64_t finalAverageOffset = 0;
 
 volatile bool buttonTriggered = false;
 
@@ -80,8 +80,8 @@ void VextOFF(void)  //Vext default OFF
 
 void syncTime(uint64_t remoteTime) {
 
-  uint64_t localTime = micros();
-  uint64_t offset = (uint64_t)(remoteTime - localTime);
+  int64_t localTime = micros();
+  int64_t offset = (int64_t)(remoteTime - localTime);
   totalOffset += offset;
   timeSyncReceived++;
 
