@@ -9,6 +9,7 @@
 #include "timesync.h"
 
 #define BUTTON_PIN 0
+#define SYNC_LED_PIN 35
 
 StopWatch stopWatch;
 Display dp;
@@ -53,6 +54,9 @@ void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
 
+  pinMode(SYNC_LED_PIN, OUTPUT);
+  digitalWrite(SYNC_LED_PIN, LOW);
+
   delay(100);
 
   dp.init();
@@ -92,8 +96,10 @@ void loop() {
 
   if (timeSync.isInit()) {
     dp.drawString(0, 54, "synced - UpTime: " + String(millis() / 1000) + "s");
+    digitalWrite(SYNC_LED_PIN, HIGH);
   } else {
     dp.drawString(0, 54, "UpTime: " + String(millis() / 1000) + "s");
+    digitalWrite(SYNC_LED_PIN, LOW);
   }
 
   dp.display();
