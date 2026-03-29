@@ -31,3 +31,9 @@ To run and reset the board runn following:
 ### /dev/cu.usbmodem1101 is the port of the board, check your system for the right one
 ./esptool --no-stub --port /dev/cu.usbmodem1101 flash-id
 ```
+
+### software
+
+"start" folder contains the code for the start gate, "finish" folder contains the code for the finish gate. 
+Both can be flashed to the same board, but they have different functionality. 
+The code is written in C++ and uses the Arduino framework.
