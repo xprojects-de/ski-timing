@@ -38,6 +38,7 @@ int8_t _lastSnr = 0;
 bool _sendRequested = false;
 bool _packetReceived = false;
 bool _radioBusy = false;
+bool _rxActive = false;
 
 Lora::Lora() {}
 
@@ -108,9 +109,11 @@ void Lora::proccess() {
 
       _radioBusy = true;
       _sendRequested = false;
+      _rxActive = false;
       Radio.Send((uint8_t *)_txBuffer, strlen(_txBuffer));
 
-    } else {
+    } else if (!_rxActive) {
+      _rxActive = true;
       Radio.Rx(0);
     }
   }
@@ -143,14 +146,17 @@ void Lora::OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
     _packetReceived = false;
   }
 
+  _rxActive = false;
   _radioBusy = false;
   // Radio.Sleep();
 }
 
 void Lora::OnRxTimeout() {
+  _rxActive = false;
   _radioBusy = false;
 }
 
 void Lora::OnRxError() {
+  _rxActive = false;
   _radioBusy = false;
 }
