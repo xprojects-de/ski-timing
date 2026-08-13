@@ -19,6 +19,9 @@ public:
   bool append(float time);
   String readAll();
   bool clear();
+
+  bool readInChunks(std::function<bool(const char* buffer, size_t length)> chunkCallback);
+
 };
 
 #endif

@@ -112,3 +112,29 @@ bool Fs::clear() {
 
   return true;
 }
+
+bool Fs::readInChunks(std::function<bool(const char* buffer, size_t length)> chunkCallback) {
+
+  if (!_initialized) return false;
+
+  FILE* f = fopen("/littlefs/times.csv", "r");
+  if (f == NULL) return false;
+
+  char buffer[256];
+  size_t bytesRead;
+  bool success = true;
+
+  while ((bytesRead = fread(buffer, 1, sizeof(buffer), f)) > 0) {
+
+    if (!chunkCallback(buffer, bytesRead)) {
+      success = false;
+      break; 
+    }
+
+  }
+
+  fclose(f);
+  
+  return success;
+
+}

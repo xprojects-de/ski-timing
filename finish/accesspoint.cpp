@@ -1,3 +1,4 @@
+#include "esp_wifi_types_generic.h"
 #include "accesspoint.h"
 
 #include <Wire.h>
@@ -42,6 +43,7 @@ void AccessPoint::init() {
   ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
   ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
   ESP_ERROR_CHECK(esp_wifi_start());
+  ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
   esp_netif_ip_info_t ip_info;
   esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");

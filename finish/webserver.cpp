@@ -16,7 +16,6 @@ esp_err_t Webserver::index_handler(httpd_req_t* req) {
 }
 
 esp_err_t Webserver::data_handler(httpd_req_t* req) {
-
   Fs* myFs = (Fs*)req->user_ctx;
 
   if (myFs == NULL) {
@@ -24,13 +23,20 @@ esp_err_t Webserver::data_handler(httpd_req_t* req) {
     return ESP_FAIL;
   }
 
-  String allData = myFs->readAll();
-
   httpd_resp_set_type(req, "text/plain");
 
-  httpd_resp_send(req, allData.c_str(), HTTPD_RESP_USE_STRLEN);
+  bool result = myFs->readInChunks([req](const char* buffer, size_t length) -> bool {
+    return httpd_resp_send_chunk(req, buffer, length) == ESP_OK;
+  });
 
-  Serial.println("Data send using readAll().");
+  httpd_resp_send_chunk(req, NULL, 0);
+
+  if (result) {
+    Serial.println("Data successfully streamed using readInChunks().");
+  } else {
+    Serial.println("Stream aborted or empty file.");
+  }
+
   return ESP_OK;
 }
 
@@ -50,6 +56,11 @@ void Webserver::init(Fs* fs_instance) {
 
   httpd_handle_t server = NULL;
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+  config.lru_purge_enable = true;
+  config.recv_wait_timeout = 10;
+  config.send_wait_timeout = 10;
+  config.max_open_sockets = 4; 
 
   if (httpd_start(&server, &config) == ESP_OK) {
 
