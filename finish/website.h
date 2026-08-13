@@ -31,8 +31,15 @@ const char index_html[] PROGMEM = R"rawliteral(
 
           isUpdating = true;
 
-          fetch('/data')
-            .then(response => response.text())
+          // Timeout für fetch() - bricht Request nach 5 Sekunden ab
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+          fetch('/data', { signal: controller.signal })
+            .then(response => {
+              clearTimeout(timeoutId);
+              return response.text();
+            })
             .then(csv => {
               let lines = csv.trim().split('\n').filter(line => line.length > 0);
               
@@ -65,14 +72,20 @@ const char index_html[] PROGMEM = R"rawliteral(
               tableHTML += "</tbody>";
               document.getElementById('results').innerHTML = tableHTML;
             })
-            .catch(err => console.error("Update Fehler:", err))
+            .catch(err => {
+              if (err.name === 'AbortError') {
+                console.error("Request timeout nach 5s");
+              } else {
+                console.error("Update Fehler:", err);
+              }
+            })
             .finally(() => {
-              // Request fertig - nächster kann starten
+              clearTimeout(timeoutId);
               isUpdating = false;
             });
         }
 
-        setInterval(updateTable, 2500);
+        setInterval(updateTable, 2000);
         updateTable();
     </script>
 </body>

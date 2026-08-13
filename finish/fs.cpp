@@ -132,7 +132,7 @@ bool Fs::readInChunks(std::function<bool(const char* buffer, size_t length)> chu
   char fileBuffer[1024];
   setvbuf(f, fileBuffer, _IOFBF, sizeof(fileBuffer));
 
-  char buffer[512];
+  char buffer[1024];
   size_t bytesRead;
   bool success = true;
   int chunkCount = 0;
@@ -148,7 +148,7 @@ bool Fs::readInChunks(std::function<bool(const char* buffer, size_t length)> chu
     chunkCount++;
 
     unsigned long now = millis();
-    if (chunkCount >= 4 || (now - lastYield) >= 10) {
+    if (chunkCount >= 2 || (now - lastYield) >= 20) {
       yield();
       chunkCount = 0;
       lastYield = now;
