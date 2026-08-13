@@ -64,6 +64,7 @@ void Webserver::init(Fs* fs_instance) {
   config.stack_size = 8192;
   config.core_id = 0;
   config.task_priority = 5;
+  config.max_uri_handlers = 12;
 
   if (httpd_start(&server, &config) == ESP_OK) {
 

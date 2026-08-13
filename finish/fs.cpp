@@ -4,6 +4,7 @@
 
 Fs::Fs() {
   _initialized = false;
+  _lastId = 0;
 }
 
 Fs::~Fs() {}
@@ -34,6 +35,9 @@ void Fs::init() {
   }
 
   Serial.println("LittleFS successfully mountet under /littlefs");
+
+  _lastId = getLastId();
+
 }
 
 bool Fs::isInit() {
@@ -44,12 +48,15 @@ bool Fs::append(float time) {
 
   if (!_initialized) return false;
 
-  int nextId = getLastId() + 1;
+  _lastId++;
 
   FILE* f = fopen("/littlefs/times.csv", "a");
-  if (f == NULL) return false;
+  if (f == NULL) {
+    _lastId--;
+    return false;
+  }
 
-  fprintf(f, "%d,%.2f\n", nextId, time);
+  fprintf(f, "%d,%.2f\n", _lastId, time);
   fclose(f);
   return true;
 }
@@ -108,6 +115,8 @@ bool Fs::clear() {
 
   fclose(f);
 
+  _lastId = 0;
+
   Serial.println("Clear file successful.");
 
   return true;
@@ -120,7 +129,7 @@ bool Fs::readInChunks(std::function<bool(const char* buffer, size_t length)> chu
   FILE* f = fopen("/littlefs/times.csv", "r");
   if (f == NULL) return false;
 
-  char buffer[256];
+  char buffer[512];
   size_t bytesRead;
   bool success = true;
 
@@ -130,6 +139,8 @@ bool Fs::readInChunks(std::function<bool(const char* buffer, size_t length)> chu
       success = false;
       break; 
     }
+
+    yield();
 
   }
 
