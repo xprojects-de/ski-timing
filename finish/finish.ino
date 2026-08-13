@@ -20,6 +20,8 @@ Fs fs;
 Timesync timeSync;
 
 volatile bool buttonTriggered = false;
+unsigned long lastDisplayUpdate = 0;
+const unsigned long DISPLAY_UPDATE_INTERVAL = 50;
 
 char msg[64];
 int16_t len, rssi;
@@ -81,28 +83,34 @@ void VextOFF(void)  //Vext default OFF
 
 void loop() {
 
-  dp.clear();
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
+    lastDisplayUpdate = currentMillis;
 
-  dp.setTextAlignment(TEXT_ALIGN_LEFT);
-  dp.setFont(ArialMT_Plain_16);
-  dp.drawString(0, 0, "FINISH");
+    dp.clear();
 
-  dp.setTextAlignment(TEXT_ALIGN_CENTER);
-  dp.setFont(ArialMT_Plain_16);
-  dp.drawString(64, 25, stopWatch.draw());
+    dp.setTextAlignment(TEXT_ALIGN_LEFT);
+    dp.setFont(ArialMT_Plain_16);
+    dp.drawString(0, 0, "FINISH");
 
-  dp.setTextAlignment(TEXT_ALIGN_LEFT);
-  dp.setFont(ArialMT_Plain_10);
+    dp.setTextAlignment(TEXT_ALIGN_CENTER);
+    dp.setFont(ArialMT_Plain_16);
+    dp.drawString(64, 25, stopWatch.draw());
 
-  if (timeSync.isInit()) {
-    dp.drawString(0, 54, "synced - UpTime: " + String(millis() / 1000) + "s");
-    digitalWrite(SYNC_LED_PIN, HIGH);
-  } else {
-    dp.drawString(0, 54, "UpTime: " + String(millis() / 1000) + "s");
-    digitalWrite(SYNC_LED_PIN, LOW);
+    dp.setTextAlignment(TEXT_ALIGN_LEFT);
+    dp.setFont(ArialMT_Plain_10);
+
+    if (timeSync.isInit()) {
+      dp.drawString(0, 54, "synced - UpTime: " + String(millis() / 1000) + "s");
+      digitalWrite(SYNC_LED_PIN, HIGH);
+    } else {
+      dp.drawString(0, 54, "UpTime: " + String(millis() / 1000) + "s");
+      digitalWrite(SYNC_LED_PIN, LOW);
+    }
+
+    dp.display();
+
   }
-
-  dp.display();
 
   if (buttonTriggered == true) {
     buttonTriggered = false;
@@ -126,5 +134,6 @@ void loop() {
     }
   }
 
-  delay(5);
+  delay(10);
+
 }

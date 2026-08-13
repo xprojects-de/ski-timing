@@ -58,9 +58,11 @@ void Webserver::init(Fs* fs_instance) {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
   config.lru_purge_enable = true;
-  config.recv_wait_timeout = 10;
-  config.send_wait_timeout = 10;
-  config.max_open_sockets = 4; 
+  config.recv_wait_timeout = 30;
+  config.send_wait_timeout = 30;
+  config.max_open_sockets = 7;
+  config.stack_size = 8192;
+  config.core_id = 0;
 
   if (httpd_start(&server, &config) == ESP_OK) {
 
