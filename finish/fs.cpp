@@ -44,12 +44,32 @@ bool Fs::append(float time) {
 
   if (!_initialized) return false;
 
+  int nextId = getLastId() + 1;
+
   FILE* f = fopen("/littlefs/times.csv", "a");
   if (f == NULL) return false;
 
-  fprintf(f, "%.2f\n", time);
+  fprintf(f, "%d,%.2f\n", nextId, time);
   fclose(f);
   return true;
+}
+
+int Fs::getLastId() {
+
+  FILE* f = fopen("/littlefs/times.csv", "r");
+  if (f == NULL) return 0;
+
+  int lastId = 0;
+  char line[128];
+  while (fgets(line, sizeof(line), f)) {
+    int id;
+    if (sscanf(line, "%d,", &id) == 1) {
+      lastId = id;
+    }
+  }
+
+  fclose(f);
+  return lastId;
 }
 
 String Fs::readAll() {

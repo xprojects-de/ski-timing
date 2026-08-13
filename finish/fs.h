@@ -8,6 +8,7 @@ class Fs {
 
 private:
   bool _initialized;
+  int getLastId();
 
 public:
   Fs();

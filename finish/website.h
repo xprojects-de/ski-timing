@@ -29,16 +29,27 @@ const char index_html[] PROGMEM = R"rawliteral(
               let tableHTML = "<thead><tr><th>Nr.</th><th>Zeit (s)</th></tr></thead><tbody>";
               
               for (let i = lines.length - 1; i >= 0; i--) {
-                let rawValue = lines[i].trim();
-                if (rawValue === "") continue;
+                let line = lines[i].trim();
+                if (line === "") continue;
 
-                let floatTime = parseFloat(rawValue);
-                floatTime = floatTime / 1000.0; 
+                // Parse CSV format: id,time
+                let parts = line.split(',');
+                if (parts.length >= 2) {
+                  let runNumber = parts[0];
+                  let floatTime = parseFloat(parts[1]);
+                  floatTime = floatTime / 1000.0;
+                  let formattedTime = isNaN(floatTime) ? parts[1] : floatTime.toFixed(2);
 
-                let formattedTime = isNaN(floatTime) ? rawValue : floatTime.toFixed(2);
-                let runNumber = i + 1;
+                  tableHTML += "<tr><td>" + runNumber + "</td><td><strong>" + formattedTime + " s</strong></td></tr>";
+                } else {
+                  // Fallback für altes Format (nur Zeit)
+                  let floatTime = parseFloat(line);
+                  floatTime = floatTime / 1000.0;
+                  let formattedTime = isNaN(floatTime) ? line : floatTime.toFixed(2);
+                  let runNumber = i + 1;
 
-                tableHTML += "<tr><td>" + runNumber + "</td><td><strong>" + formattedTime + " s</strong></td></tr>";
+                  tableHTML += "<tr><td>" + runNumber + "</td><td><strong>" + formattedTime + " s</strong></td></tr>";
+                }
               }
               
               tableHTML += "</tbody>";
