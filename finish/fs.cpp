@@ -129,9 +129,14 @@ bool Fs::readInChunks(std::function<bool(const char* buffer, size_t length)> chu
   FILE* f = fopen("/littlefs/times.csv", "r");
   if (f == NULL) return false;
 
+  char fileBuffer[1024];
+  setvbuf(f, fileBuffer, _IOFBF, sizeof(fileBuffer));
+
   char buffer[512];
   size_t bytesRead;
   bool success = true;
+  int chunkCount = 0;
+  unsigned long lastYield = millis();
 
   while ((bytesRead = fread(buffer, 1, sizeof(buffer), f)) > 0) {
 
@@ -140,7 +145,14 @@ bool Fs::readInChunks(std::function<bool(const char* buffer, size_t length)> chu
       break; 
     }
 
-    yield();
+    chunkCount++;
+
+    unsigned long now = millis();
+    if (chunkCount >= 4 || (now - lastYield) >= 10) {
+      yield();
+      chunkCount = 0;
+      lastYield = now;
+    }
 
   }
 

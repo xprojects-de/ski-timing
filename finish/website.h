@@ -20,7 +20,17 @@ const char index_html[] PROGMEM = R"rawliteral(
         </table>
 
     <script>
+        let isUpdating = false;  // Flag um mehrfache gleichzeitige Requests zu verhindern
+
         function updateTable() {
+          // Verhindere mehrfache parallele Requests
+          if (isUpdating) {
+            console.log("Update already in progress, skipping...");
+            return;
+          }
+
+          isUpdating = true;
+
           fetch('/data')
             .then(response => response.text())
             .then(csv => {
@@ -55,11 +65,15 @@ const char index_html[] PROGMEM = R"rawliteral(
               tableHTML += "</tbody>";
               document.getElementById('results').innerHTML = tableHTML;
             })
-            .catch(err => console.error("Update Fehler:", err));
+            .catch(err => console.error("Update Fehler:", err))
+            .finally(() => {
+              // Request fertig - nächster kann starten
+              isUpdating = false;
+            });
         }
 
-        setInterval(updateTable, 2000);
-        updateTable(); // Sofort-Start
+        setInterval(updateTable, 2500);
+        updateTable();
     </script>
 </body>
 </html>

@@ -25,17 +25,17 @@ esp_err_t Webserver::data_handler(httpd_req_t* req) {
 
   httpd_resp_set_type(req, "text/plain");
 
+  // Deaktiviere Keep-Alive für /data Requests - Socket wird sofort nach Response freigegeben
+  httpd_resp_set_hdr(req, "Connection", "close");
+
+  // Cache deaktivieren damit Browser immer aktuelle Daten bekommt
+  httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
+
   bool result = myFs->readInChunks([req](const char* buffer, size_t length) -> bool {
     return httpd_resp_send_chunk(req, buffer, length) == ESP_OK;
   });
 
   httpd_resp_send_chunk(req, NULL, 0);
-
-  if (result) {
-    Serial.println("Data successfully streamed using readInChunks().");
-  } else {
-    Serial.println("Stream aborted or empty file.");
-  }
 
   return ESP_OK;
 }
@@ -58,13 +58,17 @@ void Webserver::init(Fs* fs_instance) {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
   config.lru_purge_enable = true;
-  config.recv_wait_timeout = 30;
-  config.send_wait_timeout = 30;
+
+  config.recv_wait_timeout = 10;
+  config.send_wait_timeout = 10;
+
   config.max_open_sockets = 7;
   config.stack_size = 8192;
   config.core_id = 0;
   config.task_priority = 5;
   config.max_uri_handlers = 12;
+  config.keep_alive_enable = false;
+  config.backlog_conn = 10;
 
   if (httpd_start(&server, &config) == ESP_OK) {
 
