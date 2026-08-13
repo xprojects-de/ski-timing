@@ -63,6 +63,7 @@ void Webserver::init(Fs* fs_instance) {
   config.max_open_sockets = 7;
   config.stack_size = 8192;
   config.core_id = 0;
+  config.task_priority = 5;
 
   if (httpd_start(&server, &config) == ESP_OK) {
 

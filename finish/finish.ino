@@ -134,6 +134,9 @@ void loop() {
     }
   }
 
-  delay(10);
+
+  yield();
+
+  delay(5);
 
 }
