@@ -66,7 +66,7 @@ void setup() {
   lora.init();
   accessPoint.init();
   fs_instance.init();
-  webserver.init(&fs_instance);
+  webserver.init(&fs_instance, &stopWatch);
 
   dp.setFont(ArialMT_Plain_10);
 }
@@ -95,7 +95,7 @@ void loop() {
     dp.drawString(0, 0, "FINISH");
 
     dp.setTextAlignment(TEXT_ALIGN_CENTER);
-    dp.setFont(ArialMT_Plain_16);
+    dp.setFont(ArialMT_Plain_10);
     dp.drawString(64, 25, stopWatch.draw());
 
     dp.setTextAlignment(TEXT_ALIGN_LEFT);
@@ -110,7 +110,6 @@ void loop() {
     }
 
     dp.display();
-
   }
 
   if (buttonTriggered == true) {
@@ -142,5 +141,4 @@ void loop() {
   yield();
 
   delay(5);
-
 }

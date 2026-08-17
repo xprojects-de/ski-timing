@@ -37,7 +37,6 @@ void CFs::init() {
   Serial.println("LittleFS successfully mountet under /littlefs");
 
   _lastId = getLastId();
-
 }
 
 bool CFs::isInit() {
@@ -145,7 +144,7 @@ bool CFs::readInChunks(std::function<bool(const char* buffer, size_t length)> ch
 
     if (!chunkCallback(buffer, bytesRead)) {
       success = false;
-      break; 
+      break;
     }
 
     chunkCount++;
@@ -156,12 +155,10 @@ bool CFs::readInChunks(std::function<bool(const char* buffer, size_t length)> ch
       chunkCount = 0;
       lastYield = now;
     }
-
   }
 
   free(buffer);
   fclose(f);
-  
-  return success;
 
+  return success;
 }

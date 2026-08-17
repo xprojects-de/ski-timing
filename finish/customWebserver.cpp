@@ -34,11 +34,12 @@ void CustomWebserver::data_handler(AsyncWebServerRequest *request) {
   response->addHeader("Connection", "close");
   response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   request->send(response);
-
 }
 
 void CustomWebserver::reset_handler(AsyncWebServerRequest *request) {
-  if (fs_instance != nullptr && fs_instance->clear()) {
+
+  if (fs_instance != nullptr && sw_instance != nullptr && sw_instance->reset() && fs_instance->clear()) {
+
     AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "Data deleted. <a href='/'>Back</a>");
     response->addHeader("Connection", "close");
     request->send(response);
@@ -49,8 +50,41 @@ void CustomWebserver::reset_handler(AsyncWebServerRequest *request) {
   }
 }
 
-void CustomWebserver::init(CFs* fs_inst) {
+void CustomWebserver::enableContinuousMode_handler(AsyncWebServerRequest *request) {
+  if (sw_instance != nullptr) {
+
+    sw_instance->setContinuousMode(true);
+
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "");
+    response->addHeader("Connection", "close");
+    request->send(response);
+  } else {
+    AsyncWebServerResponse *response = request->beginResponse(500, "text/plain", "");
+    response->addHeader("Connection", "close");
+    request->send(response);
+  }
+}
+
+void CustomWebserver::disableContinuousMode_handler(AsyncWebServerRequest *request) {
+  if (sw_instance != nullptr) {
+
+    sw_instance->setContinuousMode(false);
+
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "");
+    response->addHeader("Connection", "close");
+    request->send(response);
+  } else {
+    AsyncWebServerResponse *response = request->beginResponse(500, "text/plain", "");
+    response->addHeader("Connection", "close");
+    request->send(response);
+  }
+}
+
+void CustomWebserver::init(CFs *fs_inst, StopWatch *sw_inst) {
+
   fs_instance = fs_inst;
+  sw_instance = sw_inst;
+
   server = new AsyncWebServer(80);
 
   server->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
@@ -63,6 +97,14 @@ void CustomWebserver::init(CFs* fs_inst) {
 
   server->on("/reset", HTTP_GET, [this](AsyncWebServerRequest *request) {
     this->reset_handler(request);
+  });
+
+  server->on("/enableContinuousMode", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    this->enableContinuousMode_handler(request);
+  });
+
+  server->on("/disableContinuousMode", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    this->disableContinuousMode_handler(request);
   });
 
   server->onNotFound([](AsyncWebServerRequest *request) {

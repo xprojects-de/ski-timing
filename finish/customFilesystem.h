@@ -22,7 +22,6 @@ public:
   bool clear();
 
   bool readInChunks(std::function<bool(const char* buffer, size_t length)> chunkCallback);
-
 };
 
 #endif

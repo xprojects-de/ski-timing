@@ -11,6 +11,7 @@ private:
   int64_t _lastTime;
   bool _isRunning;
   int64_t _offset;
+  bool _isContinuousMode;
 
 public:
   StopWatch();
@@ -21,6 +22,8 @@ public:
   void triggerStart(uint64_t time);
   void triggerFinish(CFs* fs_instance);
   String draw();
+  void setContinuousMode(bool continuousMode);
+  bool reset();
 
   static String formatTime(int64_t ms);
 };
