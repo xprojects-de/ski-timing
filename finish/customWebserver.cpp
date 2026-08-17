@@ -16,29 +16,36 @@ CustomWebserver::~CustomWebserver() {
 }
 
 void CustomWebserver::index_handler(AsyncWebServerRequest *request) {
-  request->send_P(200, "text/html", index_html);
+  AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html);
+  response->addHeader("Cache-Control", "max-age=3600");
+  response->addHeader("Connection", "close");
+  request->send(response);
 }
 
 void CustomWebserver::data_handler(AsyncWebServerRequest *request) {
-
   if (fs_instance == nullptr) {
     request->send(500, "text/plain", "No FS Instance");
     return;
   }
 
-  String data = fs_instance->readAll();
+  String data = "1,1345.89"; // fs_instance->readAll();
 
+  // Schnelle Text-Antwort ohne schwere Header
   AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", data);
+  response->addHeader("Connection", "close");
   response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   request->send(response);
-
 }
 
 void CustomWebserver::reset_handler(AsyncWebServerRequest *request) {
   if (fs_instance != nullptr && fs_instance->clear()) {
-    request->send(200, "text/html", "Data deleted. <a href='/'>Back</a>");
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "Data deleted. <a href='/'>Back</a>");
+    response->addHeader("Connection", "close");
+    request->send(response);
   } else {
-    request->send(500, "text/plain", "Error");
+    AsyncWebServerResponse *response = request->beginResponse(500, "text/plain", "Error");
+    response->addHeader("Connection", "close");
+    request->send(response);
   }
 }
 
@@ -58,7 +65,13 @@ void CustomWebserver::init(CFs* fs_inst) {
     this->reset_handler(request);
   });
 
+  server->onNotFound([](AsyncWebServerRequest *request) {
+    Serial.printf("404: %s\n", request->url().c_str());
+    AsyncWebServerResponse *response = request->beginResponse(404, "text/plain", "");
+    response->addHeader("Connection", "close");
+    request->send(response);
+  });
+
   server->begin();
   Serial.println("Webserver started!");
-  
 }

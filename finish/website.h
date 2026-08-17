@@ -85,7 +85,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             });
         }
 
-        setInterval(updateTable, 2000);
+        setInterval(updateTable, 3000);
         updateTable();
     </script>
 </body>

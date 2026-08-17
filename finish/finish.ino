@@ -21,7 +21,8 @@ Timesync timeSync;
 
 volatile bool buttonTriggered = false;
 unsigned long lastDisplayUpdate = 0;
-const unsigned long DISPLAY_UPDATE_INTERVAL = 50;
+const unsigned long DISPLAY_UPDATE_INTERVAL = 100;
+unsigned long lastLoraProcess = 0;
 
 char msg[64];
 int16_t len, rssi;
@@ -117,7 +118,10 @@ void loop() {
     stopWatch.triggerFinish(&fs_instance);
   }
 
-  lora.proccess();
+  if (millis() - lastLoraProcess >= 5) {
+    lastLoraProcess = millis();
+    lora.proccess();
+  }
 
   if (lora.available() == true) {
 
