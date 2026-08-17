@@ -4,8 +4,8 @@
 #include "display.h"
 #include "lora.h"
 #include "accesspoint.h"
-#include "webserver.h"
-#include "fs.h"
+#include "customWebserver.h"
+#include "customFilesystem.h"
 #include "timesync.h"
 
 #define BUTTON_PIN 0
@@ -15,8 +15,8 @@ StopWatch stopWatch;
 Display dp;
 Lora lora;
 AccessPoint accessPoint;
-Webserver webserver;
-Fs fs;
+CustomWebserver webserver;
+CFs fs_instance;
 Timesync timeSync;
 
 volatile bool buttonTriggered = false;
@@ -64,8 +64,8 @@ void setup() {
   dp.init();
   lora.init();
   accessPoint.init();
-  fs.init();
-  webserver.init(&fs);
+  fs_instance.init();
+  webserver.init(&fs_instance);
 
   dp.setFont(ArialMT_Plain_10);
 }
@@ -114,7 +114,7 @@ void loop() {
 
   if (buttonTriggered == true) {
     buttonTriggered = false;
-    stopWatch.triggerFinish(&fs);
+    stopWatch.triggerFinish(&fs_instance);
   }
 
   lora.proccess();

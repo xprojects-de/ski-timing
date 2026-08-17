@@ -1,10 +1,10 @@
-#ifndef FS_H
-#define FS_H
+#ifndef CFS_H
+#define CFS_H
 
 #include <Wire.h>
 #include <Arduino.h>
 
-class Fs {
+class CFs {
 
 private:
   bool _initialized;
@@ -12,8 +12,8 @@ private:
   int getLastId();
 
 public:
-  Fs();
-  ~Fs();
+  CFs();
+  ~CFs();
 
   void init();
   bool isInit();

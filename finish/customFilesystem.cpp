@@ -1,15 +1,15 @@
-#include "fs.h"
+#include "customFilesystem.h"
 
 #include <esp_littlefs.h>
 
-Fs::Fs() {
+CFs::CFs() {
   _initialized = false;
   _lastId = 0;
 }
 
-Fs::~Fs() {}
+CFs::~CFs() {}
 
-void Fs::init() {
+void CFs::init() {
 
   esp_vfs_littlefs_conf_t conf = {
     .base_path = "/littlefs",
@@ -40,11 +40,11 @@ void Fs::init() {
 
 }
 
-bool Fs::isInit() {
+bool CFs::isInit() {
   return _initialized;
 }
 
-bool Fs::append(float time) {
+bool CFs::append(float time) {
 
   if (!_initialized) return false;
 
@@ -61,7 +61,7 @@ bool Fs::append(float time) {
   return true;
 }
 
-int Fs::getLastId() {
+int CFs::getLastId() {
 
   FILE* f = fopen("/littlefs/times.csv", "r");
   if (f == NULL) return 0;
@@ -79,7 +79,7 @@ int Fs::getLastId() {
   return lastId;
 }
 
-String Fs::readAll() {
+String CFs::readAll() {
 
   if (!_initialized) return "FS not init";
 
@@ -102,7 +102,7 @@ String Fs::readAll() {
   return content;
 }
 
-bool Fs::clear() {
+bool CFs::clear() {
 
   if (!_initialized) return false;
 
@@ -122,7 +122,7 @@ bool Fs::clear() {
   return true;
 }
 
-bool Fs::readInChunks(std::function<bool(const char* buffer, size_t length)> chunkCallback) {
+bool CFs::readInChunks(std::function<bool(const char* buffer, size_t length)> chunkCallback) {
 
   if (!_initialized) return false;
 

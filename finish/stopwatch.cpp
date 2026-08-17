@@ -27,7 +27,7 @@ void StopWatch::triggerStart(uint64_t time) {
   }
 }
 
-void StopWatch::triggerFinish(Fs* fs_instance) {
+void StopWatch::triggerFinish(CFs* fs_instance) {
 
   if (!_isRunning) return;
 

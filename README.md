@@ -12,6 +12,9 @@ Unter preferences, add following URLs under  the "Additional Boards Manager URLs
 
 Under Library Manager, install following libraries
 - Heltec ESP32 Dev-Boards
+- ESPAsyncWebServer (https://github.com/ESP32Async/ESPAsyncWebServer)
+  - Install via Library Manager or manually from GitHub
+  - This also requires AsyncTCP library (https://github.com/me-no-dev/AsyncTCP)
 
 
 Select the right Board and settings under Tools (see image)
