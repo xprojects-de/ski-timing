@@ -28,13 +28,13 @@ void CustomWebserver::data_handler(AsyncWebServerRequest *request) {
     return;
   }
 
-  String data = "1,1345.89"; // fs_instance->readAll();
+  String data = fs_instance->readAll();
 
-  // Schnelle Text-Antwort ohne schwere Header
   AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", data);
   response->addHeader("Connection", "close");
   response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   request->send(response);
+
 }
 
 void CustomWebserver::reset_handler(AsyncWebServerRequest *request) {
