@@ -21,7 +21,6 @@ Timesync timeSync;
 volatile bool buttonTriggered = false;
 unsigned long lastDisplayUpdate = 0;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 200;
-unsigned long lastLoraProcess = 0;
 unsigned long lastButtonPress = 0;
 
 char msg[64];
@@ -67,6 +66,8 @@ void setup() {
   lora.preInit();
   dp.init();
   lora.init();
+  lora.startTask();
+
   accessPoint.init();
   fs_instance.init();
   webserver.init(&fs_instance, &stopWatch);
@@ -110,11 +111,6 @@ void loop() {
       stopWatch.triggerFinish(&fs_instance);
     }
     buttonTriggered = false;
-  }
-
-  if (currentMillis - lastLoraProcess >= 5) {
-    lastLoraProcess = currentMillis;
-    lora.proccess();
   }
 
   if (lora.available()) {

@@ -4,28 +4,19 @@
 
 #define TX_OUTPUT_POWER 14  // dBm
 
-#define LORA_BANDWIDTH 0          // [0: 125 kHz, \
-                                 //  1: 250 kHz, \
-                                 //  2: 500 kHz, \
-                                 //  3: Reserved]
+#define LORA_BANDWIDTH 0          // [0: 125 kHz, 1: 250 kHz, 2: 500 kHz, 3: Reserved]
 #define LORA_SPREADING_FACTOR 10  // [SF7..SF12]
-#define LORA_CODINGRATE 4         // [1: 4/5, \
-                                 //  2: 4/6, \
-                                 //  3: 4/7, \
-                                 //  4: 4/8]
+#define LORA_CODINGRATE 4         // [1: 4/5, 2: 4/6, 3: 4/7, 4: 4/8]
 #define LORA_PREAMBLE_LENGTH 8    // Same for Tx and Rx
 #define LORA_SYMBOL_TIMEOUT 0     // Symbols
 #define LORA_FIX_LENGTH_PAYLOAD_ON false
 #define LORA_IQ_INVERSION_ON false
-
 
 #define RX_TIMEOUT_VALUE 1000
 #define BUFFER_SIZE 30
 
 #define LORA_PREFIX "ST-"
 #define PREFIX_LEN 3
-
-// #define LORA_SYNCWORD 0x19
 
 static RadioEvents_t RadioEvents;
 
@@ -40,9 +31,22 @@ bool _packetReceived = false;
 bool _radioBusy = false;
 bool _rxActive = false;
 
+static void loraTaskWorker(void *parameter) {
+  Lora *loraInstance = static_cast<Lora *>(parameter);
+  for (;;) {
+    loraInstance->proccess();
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
 Lora::Lora() {}
 
-Lora::~Lora() {}
+Lora::~Lora() {
+  if (_taskHandle != NULL) {
+    vTaskDelete(_taskHandle);
+    _taskHandle = NULL;
+  }
+}
 
 void Lora::preInit() {
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
@@ -59,7 +63,6 @@ void Lora::init() {
   Radio.Init(&RadioEvents);
 
   Radio.SetPublicNetwork(false);
-  // Radio.SetSyncWord(LORA_SYNCWORD);
 
   Radio.SetChannel(RF_FREQUENCY);
 
@@ -74,6 +77,19 @@ void Lora::init() {
                     0, true, 0, 0, LORA_IQ_INVERSION_ON, true);
 
   _radioBusy = false;
+}
+
+void Lora::startTask(UBaseType_t priority, BaseType_t coreID) {
+  if (_taskHandle == NULL) {
+    xTaskCreatePinnedToCore(
+      loraTaskWorker,
+      "LoraTask",
+      4096,
+      this,
+      priority,
+      &_taskHandle,
+      coreID);
+  }
 }
 
 void Lora::sendData(const char *data) {
@@ -125,7 +141,6 @@ void Lora::OnTxDone() {
 }
 
 void Lora::OnTxTimeout() {
-  //Radio.Sleep();
   _radioBusy = false;
 }
 
@@ -148,7 +163,6 @@ void Lora::OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
 
   _rxActive = false;
   _radioBusy = false;
-  // Radio.Sleep();
 }
 
 void Lora::OnRxTimeout() {
