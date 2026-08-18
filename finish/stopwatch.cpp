@@ -95,6 +95,10 @@ void StopWatch::setContinuousMode(bool continuousMode) {
   _isContinuousMode = continuousMode;
 }
 
+bool StopWatch::isContinuousMode() {
+  return _isContinuousMode;
+}
+
 bool StopWatch::reset() {
   _lastTime = 0;
   _isRunning = false;

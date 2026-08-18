@@ -85,7 +85,12 @@ void loop() {
 
     dp.setTextAlignment(TEXT_ALIGN_LEFT);
     dp.setFont(ArialMT_Plain_16);
-    dp.drawString(0, 0, "FINISH");
+
+    if (stopWatch.isContinuousMode()) {
+      dp.drawString(0, 0, "FINISH (C)");
+    } else {
+      dp.drawString(0, 0, "FINISH (N)");
+    }
 
     dp.setTextAlignment(TEXT_ALIGN_CENTER);
     dp.setFont(ArialMT_Plain_10);

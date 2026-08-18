@@ -23,6 +23,7 @@ public:
   void triggerFinish(CFs* fs_instance);
   String draw();
   void setContinuousMode(bool continuousMode);
+  bool isContinuousMode();
   bool reset();
 
   static String formatTime(int64_t ms);
