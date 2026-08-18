@@ -116,7 +116,7 @@ bool CFs::readInChunks(std::function<bool(const char* buffer, size_t length)> ch
       chunkCount++;
       unsigned long now = millis();
       if (chunkCount >= 2 || (now - lastYield) >= 20) {
-        yield();
+        vTaskDelay(1);
         chunkCount = 0;
         lastYield = now;
       }

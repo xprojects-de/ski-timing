@@ -1,4 +1,3 @@
-// For a connection via I2C using the Arduino Wire include:
 #include <Wire.h>
 #include "stopwatch.h"
 #include "display.h"
@@ -21,8 +20,9 @@ Timesync timeSync;
 
 volatile bool buttonTriggered = false;
 unsigned long lastDisplayUpdate = 0;
-const unsigned long DISPLAY_UPDATE_INTERVAL = 100;
+const unsigned long DISPLAY_UPDATE_INTERVAL = 200;
 unsigned long lastLoraProcess = 0;
+unsigned long lastButtonPress = 0;
 
 char msg[64];
 int16_t len, rssi;
@@ -32,36 +32,39 @@ void IRAM_ATTR handleButtonPress() {
   buttonTriggered = true;
 }
 
-void showChipId() {
+void VextON(void) {
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, LOW);
+}
 
-  // Licence
-  // https://resource.heltec.cn/search
+void VextOFF(void) {
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, HIGH);
+}
+
+void showChipId() {
   uint64_t chipId = ESP.getEfuseMac();
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
-  Serial.printf("ESP32ChipID=%04X", (uint16_t)(chipId >> 32));
-  Serial.printf("%08X\r\n", (uint32_t)chipId);
+  Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
 }
 
 void setup() {
-
   Serial.begin(115200);
-  Serial.println();
-  Serial.println();
+  Serial.println("\n\n--- SKI TIMING FINISH ---");
+
+  VextON();
+  delay(50);
 
   showChipId();
 
-  lora.preInit();
-
-  VextON();
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
 
   pinMode(SYNC_LED_PIN, OUTPUT);
   digitalWrite(SYNC_LED_PIN, LOW);
 
-  delay(100);
-
+  lora.preInit();
   dp.init();
   lora.init();
   accessPoint.init();
@@ -71,20 +74,9 @@ void setup() {
   dp.setFont(ArialMT_Plain_10);
 }
 
-void VextON(void) {
-  pinMode(Vext, OUTPUT);
-  digitalWrite(Vext, LOW);
-}
-
-void VextOFF(void)  //Vext default OFF
-{
-  pinMode(Vext, OUTPUT);
-  digitalWrite(Vext, HIGH);
-}
-
 void loop() {
-
   unsigned long currentMillis = millis();
+
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
     lastDisplayUpdate = currentMillis;
 
@@ -102,28 +94,30 @@ void loop() {
     dp.setFont(ArialMT_Plain_10);
 
     if (timeSync.isInit()) {
-      dp.drawString(0, 54, "synced - UpTime: " + String(millis() / 1000) + "s");
+      dp.drawString(0, 54, "synced - UpTime: " + String(currentMillis / 1000) + "s");
       digitalWrite(SYNC_LED_PIN, HIGH);
     } else {
-      dp.drawString(0, 54, "UpTime: " + String(millis() / 1000) + "s");
+      dp.drawString(0, 54, "UpTime: " + String(currentMillis / 1000) + "s");
       digitalWrite(SYNC_LED_PIN, LOW);
     }
 
     dp.display();
   }
 
-  if (buttonTriggered == true) {
+  if (buttonTriggered) {
+    if (currentMillis - lastButtonPress > 200) {
+      lastButtonPress = currentMillis;
+      stopWatch.triggerFinish(&fs_instance);
+    }
     buttonTriggered = false;
-    stopWatch.triggerFinish(&fs_instance);
   }
 
-  if (millis() - lastLoraProcess >= 5) {
-    lastLoraProcess = millis();
+  if (currentMillis - lastLoraProcess >= 5) {
+    lastLoraProcess = currentMillis;
     lora.proccess();
   }
 
-  if (lora.available() == true) {
-
+  if (lora.available()) {
     lora.getPacket(msg, len, rssi, snr);
 
     Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
@@ -137,8 +131,5 @@ void loop() {
     }
   }
 
-
-  yield();
-
-  delay(5);
+  vTaskDelay(1);
 }
