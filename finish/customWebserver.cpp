@@ -18,7 +18,6 @@ CustomWebserver::~CustomWebserver() {
 void CustomWebserver::index_handler(AsyncWebServerRequest *request) {
   AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html);
   response->addHeader("Cache-Control", "max-age=3600");
-  response->addHeader("Connection", "close");
   request->send(response);
 }
 
@@ -31,21 +30,18 @@ void CustomWebserver::data_handler(AsyncWebServerRequest *request) {
   String data = fs_instance->readAll();
 
   AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", data);
-  response->addHeader("Connection", "close");
   response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   request->send(response);
 }
 
 void CustomWebserver::reset_handler(AsyncWebServerRequest *request) {
-
   if (fs_instance != nullptr && sw_instance != nullptr && sw_instance->reset() && fs_instance->clear()) {
 
     AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "Data deleted. <a href='/'>Back</a>");
-    response->addHeader("Connection", "close");
     request->send(response);
   } else {
+
     AsyncWebServerResponse *response = request->beginResponse(500, "text/plain", "Error");
-    response->addHeader("Connection", "close");
     request->send(response);
   }
 }
@@ -56,11 +52,11 @@ void CustomWebserver::enableContinuousMode_handler(AsyncWebServerRequest *reques
     sw_instance->setContinuousMode(true);
 
     AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "");
-    response->addHeader("Connection", "close");
     request->send(response);
+
   } else {
+
     AsyncWebServerResponse *response = request->beginResponse(500, "text/plain", "");
-    response->addHeader("Connection", "close");
     request->send(response);
   }
 }
@@ -71,11 +67,11 @@ void CustomWebserver::disableContinuousMode_handler(AsyncWebServerRequest *reque
     sw_instance->setContinuousMode(false);
 
     AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "");
-    response->addHeader("Connection", "close");
     request->send(response);
+
   } else {
+
     AsyncWebServerResponse *response = request->beginResponse(500, "text/plain", "");
-    response->addHeader("Connection", "close");
     request->send(response);
   }
 }

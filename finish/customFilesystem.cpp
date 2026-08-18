@@ -1,6 +1,5 @@
 #include "customFilesystem.h"
-
-#include <esp_littlefs.h>
+#include <LittleFS.h>
 
 CFs::CFs() {
   _initialized = false;
@@ -11,30 +10,14 @@ CFs::~CFs() {}
 
 void CFs::init() {
 
-  esp_vfs_littlefs_conf_t conf = {
-    .base_path = "/littlefs",
-    .partition_label = "spiffs",
-    .format_if_mount_failed = true,
-    .dont_mount = false
-  };
-
-  esp_err_t ret = esp_vfs_littlefs_register(&conf);
-  _initialized = ret == ESP_OK;
-
-  if (ret != ESP_OK) {
-
-    if (ret == ESP_FAIL) {
-      Serial.println("error mounting!");
-    } else if (ret == ESP_ERR_NOT_FOUND) {
-      Serial.println("no partition found!");
-    } else {
-      Serial.printf("error initialize (%s)\n", esp_err_to_name(ret));
-    }
-
+  if (!LittleFS.begin(true)) {
+    Serial.println("LittleFS Mount Failed!");
+    _initialized = false;
     return;
   }
 
-  Serial.println("LittleFS successfully mountet under /littlefs");
+  _initialized = true;
+  Serial.println("LittleFS successfully mounted");
 
   _lastId = getLastId();
 }
@@ -44,121 +27,103 @@ bool CFs::isInit() {
 }
 
 bool CFs::append(float time) {
-
   if (!_initialized) return false;
 
   _lastId++;
 
-  FILE* f = fopen("/littlefs/times.csv", "a");
-  if (f == NULL) {
+  File f = LittleFS.open("/times.csv", FILE_APPEND);
+  if (!f) {
     _lastId--;
     return false;
   }
 
-  fprintf(f, "%d,%.2f\n", _lastId, time);
-  fclose(f);
+  f.printf("%d,%.2f\n", _lastId, time);
+  f.close();
   return true;
 }
 
 int CFs::getLastId() {
+  if (!LittleFS.exists("/times.csv")) return 0;
 
-  FILE* f = fopen("/littlefs/times.csv", "r");
-  if (f == NULL) return 0;
+  File f = LittleFS.open("/times.csv", FILE_READ);
+  if (!f) return 0;
 
   int lastId = 0;
-  char line[128];
-  while (fgets(line, sizeof(line), f)) {
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
     int id;
-    if (sscanf(line, "%d,", &id) == 1) {
+    if (sscanf(line.c_str(), "%d,", &id) == 1) {
       lastId = id;
     }
   }
 
-  fclose(f);
+  f.close();
   return lastId;
 }
 
 String CFs::readAll() {
-
   if (!_initialized) return "FS not init";
+  if (!LittleFS.exists("/times.csv")) return "";
 
-  struct stat st;
-  if (stat("/littlefs/times.csv", &st) != 0) {
-    return "";
-  }
+  File f = LittleFS.open("/times.csv", FILE_READ);
+  if (!f) return "";
 
-  FILE* f = fopen("/littlefs/times.csv", "r");
-  if (f == NULL) return "";
-
-  String content = "";
-  char line[64];
-  while (fgets(line, sizeof(line), f)) {
-    content += line;
-  }
-
-  fclose(f);
+  String content = f.readString();
+  f.close();
 
   return content;
 }
 
 bool CFs::clear() {
-
   if (!_initialized) return false;
 
-  FILE* f = fopen("/littlefs/times.csv", "w");
-
-  if (f == NULL) {
+  File f = LittleFS.open("/times.csv", FILE_WRITE);
+  if (!f) {
     Serial.println("error clear file!");
     return false;
   }
 
-  fclose(f);
-
+  f.close();
   _lastId = 0;
 
   Serial.println("Clear file successful.");
-
   return true;
 }
 
 bool CFs::readInChunks(std::function<bool(const char* buffer, size_t length)> chunkCallback) {
-
   if (!_initialized) return false;
+  if (!LittleFS.exists("/times.csv")) return false;
 
-  FILE* f = fopen("/littlefs/times.csv", "r");
-  if (f == NULL) return false;
+  File f = LittleFS.open("/times.csv", FILE_READ);
+  if (!f) return false;
 
-  size_t bufferSize = 512;
-  char* buffer = (char*)malloc(bufferSize);
-  if (buffer == NULL) {
-    fclose(f);
-    return false;
-  }
+  const size_t bufferSize = 512;
+  char buffer[bufferSize];
 
-  size_t bytesRead;
   bool success = true;
   int chunkCount = 0;
   unsigned long lastYield = millis();
 
-  while ((bytesRead = fread(buffer, 1, bufferSize, f)) > 0) {
+  while (f.available()) {
+    size_t bytesRead = f.readBytes(buffer, bufferSize);
 
-    if (!chunkCallback(buffer, bytesRead)) {
-      success = false;
-      break;
-    }
+    if (bytesRead > 0) {
+      if (!chunkCallback(buffer, bytesRead)) {
+        success = false;
+        break;
+      }
 
-    chunkCount++;
-
-    unsigned long now = millis();
-    if (chunkCount >= 2 || (now - lastYield) >= 20) {
-      yield();
-      chunkCount = 0;
-      lastYield = now;
+      chunkCount++;
+      unsigned long now = millis();
+      if (chunkCount >= 2 || (now - lastYield) >= 20) {
+        yield();
+        chunkCount = 0;
+        lastYield = now;
+      }
     }
   }
 
-  free(buffer);
-  fclose(f);
-
+  f.close();
   return success;
+
 }

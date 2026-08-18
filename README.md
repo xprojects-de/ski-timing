@@ -7,8 +7,12 @@
 Download and install https://www.arduino.cc/en/software/
 
 Unter preferences, add following URLs under  the "Additional Boards Manager URLs"
-- https://resource.heltec.cn/download/package_heltec_esp32_index.json
-- (optional) https://dl.espressif.com/dl/package_esp32_index.json
+- [https://resource.heltec.cn/download/package_heltec_esp32_index.json](https://espressif.github.io/arduino-esp32/package_esp32_index.json)
+- [https://dl.espressif.com/dl/package_esp32_index.json](https://resource.heltec.cn/download/package_heltec_esp32_index.json)
+
+Under Board-Maanger install following:
+- esp32 by espressif
+- Healtec esp32 series Arduino Development environment
 
 Under Library Manager, install following libraries
 - Heltec ESP32 Dev-Boards

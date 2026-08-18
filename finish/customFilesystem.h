@@ -1,8 +1,8 @@
 #ifndef CFS_H
 #define CFS_H
 
-#include <Wire.h>
 #include <Arduino.h>
+#include <functional>
 
 class CFs {
 
