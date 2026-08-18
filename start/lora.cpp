@@ -39,9 +39,22 @@ bool _sendRequested = false;
 bool _packetReceived = false;
 bool _radioBusy = false;
 
+static void loraTaskWorker(void *parameter) {
+  Lora *loraInstance = static_cast<Lora *>(parameter);
+  for (;;) {
+    loraInstance->proccess();
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
 Lora::Lora() {}
 
-Lora::~Lora() {}
+Lora::~Lora() {
+  if (_taskHandle != NULL) {
+    vTaskDelete(_taskHandle);
+    _taskHandle = NULL;
+  }
+}
 
 void Lora::preInit() {
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
@@ -73,6 +86,19 @@ void Lora::init() {
                     0, true, 0, 0, LORA_IQ_INVERSION_ON, true);
 
   _radioBusy = false;
+}
+
+void Lora::startTask(UBaseType_t priority, BaseType_t coreID) {
+  if (_taskHandle == NULL) {
+    xTaskCreatePinnedToCore(
+      loraTaskWorker,
+      "LoraTask",
+      4096,
+      this,
+      priority,
+      &_taskHandle,
+      coreID);
+  }
 }
 
 void Lora::sendData(const char *data) {
@@ -144,7 +170,6 @@ void Lora::OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
   }
 
   _radioBusy = false;
-  // Radio.Sleep();
 }
 
 void Lora::OnRxTimeout() {
