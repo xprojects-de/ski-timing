@@ -97,15 +97,6 @@ void loop() {
   battery.update(currentMillis);
 
   if (buttonTriggered) {
-    if (currentMillis - lastButtonPress > 200) {
-      lastButtonPress = currentMillis;
-      snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%lu", micros());
-      lora.sendData(timeTriggerStr);
-    }
-    buttonTriggered = false;
-  }
-
-  if (buttonTriggered) {
 
     buttonTriggered = false;
 
