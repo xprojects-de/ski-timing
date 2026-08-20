@@ -156,24 +156,29 @@ void loop() {
     buttonTriggered = false;
 
     unsigned long pressStart = millis();
-    bool isLongPress = false;
 
     while (digitalRead(BUTTON_PIN) == LOW) {
 
       if (millis() - pressStart >= 5000) {
-        isLongPress = true;
-        break;
+
+        while (digitalRead(BUTTON_PIN) == LOW) {
+          delay(10);
+        }
+
+        powerDownAndSleep();
+
+        return;
       }
+
       delay(10);
     }
 
-    if (isLongPress) {
+    unsigned long duration = millis() - pressStart;
 
-      while (digitalRead(BUTTON_PIN) == LOW) {
-        delay(10);
-      }
+    if (duration >= 2500) {
 
-      powerDownAndSleep();
+      stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
+      stopWatch.reset();
 
     } else {
 
