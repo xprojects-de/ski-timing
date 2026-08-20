@@ -12,7 +12,7 @@ Unter preferences, add following URLs under  the "Additional Boards Manager URLs
 
 Under Board-Maanger install following:
 - esp32 by espressif
-- Healtec esp32 series Arduino Development environment
+- Healtec esp32 series Arduino Development environment (https://github.com/Heltec-Aaron-Lee/WiFi_Kit_series)
 
 Under Library Manager, install following libraries
 - Heltec ESP32 Dev-Boards
