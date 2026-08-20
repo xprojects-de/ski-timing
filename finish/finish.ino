@@ -6,6 +6,7 @@
 #include "customWebserver.h"
 #include "customFilesystem.h"
 #include "timesync.h"
+#include <WiFi.h>
 
 #define BUTTON_PIN 0
 #define SYNC_LED_PIN 35
@@ -46,6 +47,36 @@ void showChipId() {
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
   Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+}
+
+void powerDownAndSleep() {
+
+  Serial.println("\n[POWER] Shutdown startet...");
+
+  dp.clear();
+  dp.setFont(ArialMT_Plain_16);
+  dp.setTextAlignment(TEXT_ALIGN_CENTER);
+  dp.drawString(64, 20, "SHUTDOWN...");
+  dp.display();
+  delay(1000);
+
+  detachInterrupt(BUTTON_PIN);
+
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+
+  digitalWrite(SYNC_LED_PIN, LOW);
+  dp.clear();
+  dp.display();
+
+  VextOFF();
+
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_PIN, 0);
+
+  Serial.println("[POWER] Go to sleep.");
+  Serial.flush();
+
+  esp_deep_sleep_start();
 }
 
 void setup() {
@@ -111,14 +142,40 @@ void loop() {
   }
 
   if (buttonTriggered) {
-    if (currentMillis - lastButtonPress > 200) {
-      lastButtonPress = currentMillis;
-      stopWatch.triggerFinish(&fs_instance);
-    }
+
     buttonTriggered = false;
+
+    unsigned long pressStart = millis();
+    bool isLongPress = false;
+
+    while (digitalRead(BUTTON_PIN) == LOW) {
+
+      if (millis() - pressStart >= 5000) {
+        isLongPress = true;
+        break;
+      }
+      delay(10);
+    }
+
+    if (isLongPress) {
+
+      while (digitalRead(BUTTON_PIN) == LOW) {
+        delay(10);
+      }
+
+      powerDownAndSleep();
+
+    } else {
+
+      if (currentMillis - lastButtonPress > 200) {
+        lastButtonPress = currentMillis;
+        stopWatch.triggerFinish(&fs_instance);
+      }
+    }
   }
 
   if (lora.available()) {
+
     lora.getPacket(msg, len, rssi, snr);
 
     Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
@@ -126,6 +183,7 @@ void loop() {
     if (strncmp(msg, "sync:", 5) == 0) {
       timeSync.syncTime(atoll(&msg[5]), &stopWatch);
     } else {
+
       if (timeSync.isInit()) {
         stopWatch.triggerStart(atoll(msg));
       }

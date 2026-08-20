@@ -41,6 +41,32 @@ void showChipId() {
   Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
 }
 
+void powerDownAndSleep() {
+
+  Serial.println("\n[POWER] Shutdown startet...");
+
+  dp.clear();
+  dp.setFont(ArialMT_Plain_16);
+  dp.setTextAlignment(TEXT_ALIGN_CENTER);
+  dp.drawString(64, 20, "SHUTDOWN...");
+  dp.display();
+  delay(1000);
+
+  detachInterrupt(BUTTON_PIN);
+
+  dp.clear();
+  dp.display();
+
+  VextOFF();
+
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_PIN, 0);
+
+  Serial.println("[POWER] Gehe in Deep Sleep.");
+  Serial.flush();
+
+  esp_deep_sleep_start();
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println();
@@ -71,6 +97,36 @@ void loop() {
       lora.sendData(timeTriggerStr);
     }
     buttonTriggered = false;
+  }
+
+  if (buttonTriggered) {
+
+    buttonTriggered = false;
+
+    unsigned long pressStart = millis();
+    bool isLongPress = false;
+
+    while (digitalRead(BUTTON_PIN) == LOW) {
+      if (millis() - pressStart >= 5000) {
+        isLongPress = true;
+        break;
+      }
+      delay(10);
+    }
+
+    if (isLongPress) {
+      while (digitalRead(BUTTON_PIN) == LOW) {
+        delay(10);
+      }
+      powerDownAndSleep();
+    } else {
+
+      if (currentMillis - lastButtonPress > 200) {
+        lastButtonPress = currentMillis;
+        snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%lu", micros());
+        lora.sendData(timeTriggerStr);
+      }
+    }
   }
 
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
