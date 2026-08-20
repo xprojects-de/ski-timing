@@ -6,6 +6,7 @@
 #include "customWebserver.h"
 #include "customFilesystem.h"
 #include "timesync.h"
+#include "batteryCheck.h"
 #include <WiFi.h>
 
 #define BUTTON_PIN 0
@@ -18,6 +19,7 @@ AccessPoint accessPoint;
 CustomWebserver webserver;
 CFs fs_instance;
 Timesync timeSync;
+BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
 unsigned long lastDisplayUpdate = 0;
@@ -103,11 +105,15 @@ void setup() {
   fs_instance.init();
   webserver.init(&fs_instance, &stopWatch);
 
+  battery.init();
+
   dp.setFont(ArialMT_Plain_10);
 }
 
 void loop() {
   unsigned long currentMillis = millis();
+
+  battery.update(currentMillis);
 
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
     lastDisplayUpdate = currentMillis;
@@ -122,6 +128,10 @@ void loop() {
     } else {
       dp.drawString(0, 0, "FINISH (N)");
     }
+
+    dp.setTextAlignment(TEXT_ALIGN_RIGHT);
+    dp.setFont(ArialMT_Plain_10);
+    dp.drawString(128, 0, String(battery.getPercentage()) + "%");
 
     dp.setTextAlignment(TEXT_ALIGN_CENTER);
     dp.setFont(ArialMT_Plain_10);

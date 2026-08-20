@@ -1,6 +1,5 @@
 #include "stopwatch.h"
 
-// Konstruktor: Initialisiert die Werte
 StopWatch::StopWatch() {
   _startTime = 0;
   _lastTime = 0;

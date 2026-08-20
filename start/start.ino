@@ -1,12 +1,14 @@
 #include <Wire.h>
 #include "display.h"
 #include "lora.h"
+#include "batteryCheck.h"
 
 #define BUTTON_PIN 0
 #define SYNC_INTERVAL_MS 5000
 
 Display dp;
 Lora lora;
+BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
 volatile unsigned long lastButtonPress = 0;
@@ -81,6 +83,7 @@ void setup() {
   attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
 
   dp.init();
+  battery.init();
   lora.init();
   lora.startTask();
 
@@ -88,7 +91,10 @@ void setup() {
 }
 
 void loop() {
+
   unsigned long currentMillis = millis();
+
+  battery.update(currentMillis);
 
   if (buttonTriggered) {
     if (currentMillis - lastButtonPress > 200) {
@@ -139,6 +145,10 @@ void loop() {
     dp.setTextAlignment(TEXT_ALIGN_LEFT);
     dp.setFont(ArialMT_Plain_16);
     dp.drawString(0, 0, "START");
+
+    dp.setTextAlignment(TEXT_ALIGN_RIGHT);
+    dp.setFont(ArialMT_Plain_10);
+    dp.drawString(128, 0, String(battery.getPercentage()) + "%");
 
     dp.setTextAlignment(TEXT_ALIGN_CENTER);
     dp.setFont(ArialMT_Plain_10);
