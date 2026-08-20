@@ -1,15 +1,16 @@
 #include "batteryCheck.h"
-#include <esp_adc_cal.h>
 
 BatteryCheck::BatteryCheck(uint8_t adc_pin, uint8_t ctrl_pin, unsigned long interval_ms)
-  : adcPin(adc_pin), ctrlPin(ctrl_pin), cachedPercentage(0), lastCheckTime(0), checkInterval(interval_ms) {}
+  : adcPin(adc_pin), ctrlPin(ctrl_pin), cachedVoltage(0), cachedPercentage(0),
+    lastCheckTime(0), checkInterval(interval_ms) {}
 
 void BatteryCheck::init() {
 
   pinMode(ctrlPin, OUTPUT);
-  digitalWrite(ctrlPin, HIGH);
+  digitalWrite(ctrlPin, LOW);
 
-  delay(50);
+  analogReadResolution(12);
+  analogSetPinAttenuation(adcPin, ADC_11db);
 
   forceUpdate();
 
@@ -18,49 +19,53 @@ void BatteryCheck::init() {
 
 uint16_t BatteryCheck::measureVoltage() {
 
-  pinMode(ctrlPin, OUTPUT);
-  digitalWrite(ctrlPin, LOW);
+  digitalWrite(ctrlPin, HIGH);
   delay(10);
 
-  analogReadResolution(12);
-  analogSetPinAttenuation(adcPin, ADC_11db);
-
-  uint32_t rawSum = 0;
+  uint32_t mvSum = 0;
   for (int i = 0; i < 10; i++) {
-    rawSum += analogRead(adcPin);
+    mvSum += analogReadMilliVolts(adcPin);
     delay(1);
   }
-  float raw = rawSum / 10.0;
+  float avgMv = mvSum / 10.0;
 
-  digitalWrite(ctrlPin, HIGH);
+  digitalWrite(ctrlPin, LOW);
 
-  float voltage = (raw / 4095.0) * 3.3 * 4.9;
-  return (uint16_t)(voltage * 1000);
+  float voltage = avgMv * 4.9;
+  return (uint16_t)voltage;
+}
+
+uint8_t BatteryCheck::voltageToPercentage(uint16_t mvolts) {
+
+  if (mvolts >= 4150) {
+    return 100;
+  } else if (mvolts <= 3300) {
+    return 0;
+  } else if (mvolts >= 4000) {
+    return 85 + (mvolts - 4000) * 15 / 150;
+  } else if (mvolts >= 3800) {
+    return 60 + (mvolts - 3800) * 25 / 200;
+  } else if (mvolts >= 3600) {
+    return 25 + (mvolts - 3600) * 35 / 200;
+  } else if (mvolts >= 3400) {
+    return 5 + (mvolts - 3400) * 20 / 200;
+  } else {
+    return (mvolts - 3300) * 5 / 100;
+  }
 }
 
 void BatteryCheck::forceUpdate() {
 
   Serial.println("Start update battery ...");
 
-  uint16_t mvolts = measureVoltage();
+  cachedVoltage = measureVoltage();
+  cachedPercentage = voltageToPercentage(cachedVoltage);
 
-  if (mvolts >= 4150) {
-    cachedPercentage = 100;
-  } else if (mvolts <= 3300) {
-    cachedPercentage = 0;
-  } else if (mvolts >= 4000) {
-    cachedPercentage = 85 + (mvolts - 4000) * 15 / 150;
-  } else if (mvolts >= 3800) {
-    cachedPercentage = 60 + (mvolts - 3800) * 25 / 200;
-  } else if (mvolts >= 3600) {
-    cachedPercentage = 25 + (mvolts - 3600) * 35 / 200;
-  } else if (mvolts >= 3400) {
-    cachedPercentage = 5 + (mvolts - 3400) * 20 / 200;
-  } else {
-    cachedPercentage = (mvolts - 3300) * 5 / 100;
-  }
-
-  Serial.println("Battery update done!");
+  Serial.print("Battery: ");
+  Serial.print(cachedVoltage);
+  Serial.print(" mV / ");
+  Serial.print(cachedPercentage);
+  Serial.println(" %");
 }
 
 void BatteryCheck::update(unsigned long currentMillis) {
@@ -73,7 +78,7 @@ void BatteryCheck::update(unsigned long currentMillis) {
 
 uint8_t BatteryCheck::getPercentage() {
 
-  if (cachedPercentage == 0 && lastCheckTime == 0) {
+  if (lastCheckTime == 0) {
     forceUpdate();
     lastCheckTime = millis();
   }
@@ -81,5 +86,10 @@ uint8_t BatteryCheck::getPercentage() {
 }
 
 uint16_t BatteryCheck::getVoltage() {
-  return measureVoltage();
+
+  if (lastCheckTime == 0) {
+    forceUpdate();
+    lastCheckTime = millis();
+  }
+  return cachedVoltage;
 }

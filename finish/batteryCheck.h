@@ -8,11 +8,13 @@ class BatteryCheck {
 private:
   uint8_t adcPin;
   uint8_t ctrlPin;
+  uint16_t cachedVoltage;
   uint8_t cachedPercentage;
   unsigned long lastCheckTime;
   unsigned long checkInterval;
 
   uint16_t measureVoltage();
+  uint8_t voltageToPercentage(uint16_t mvolts);
 
 public:
 
