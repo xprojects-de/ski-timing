@@ -11,9 +11,18 @@ Lora lora;
 BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
+volatile uint64_t buttonPressMicros = 0;
 volatile unsigned long lastButtonPress = 0;
-volatile unsigned long buttonPressMicros = 0;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 200;
+
+enum ButtonState {
+  BTN_IDLE,
+  BTN_PRESSED,
+  BTN_WAITING_RELEASE
+};
+ButtonState buttonState = BTN_IDLE;
+unsigned long buttonPressStartTime = 0;
+bool shutdownWarningShown = false;
 
 char timeTriggerStr[32] = "-";
 char syncMsg[32];
@@ -42,6 +51,59 @@ void showChipId() {
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
   Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+}
+
+void handleButtonStateMachine(unsigned long currentMillis) {
+  switch (buttonState) {
+
+    case BTN_IDLE:
+      if (buttonTriggered) {
+        buttonTriggered = false;
+        buttonState = BTN_PRESSED;
+        buttonPressStartTime = currentMillis;
+        shutdownWarningShown = false;
+      }
+      break;
+
+    case BTN_PRESSED:
+
+      if (currentMillis - buttonPressStartTime >= 5000) {
+
+        if (!shutdownWarningShown) {
+          dp.clear();
+          dp.setFont(ArialMT_Plain_16);
+          dp.setTextAlignment(TEXT_ALIGN_CENTER);
+          dp.drawString(64, 20, "RELEASE TO");
+          dp.drawString(64, 40, "SHUTDOWN");
+          dp.display();
+          shutdownWarningShown = true;
+        }
+        buttonState = BTN_WAITING_RELEASE;
+      } else if (digitalRead(BUTTON_PIN) == HIGH) {
+
+        if (currentMillis - lastButtonPress > 200) {
+          lastButtonPress = currentMillis;
+          snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", buttonPressMicros);
+          lora.sendData(timeTriggerStr);
+        }
+
+        buttonState = BTN_IDLE;
+      }
+      break;
+
+    case BTN_WAITING_RELEASE:
+      if (digitalRead(BUTTON_PIN) == HIGH) {
+
+        delay(50);
+
+        if (digitalRead(BUTTON_PIN) == HIGH) {
+          powerDownAndSleep();
+        } else {
+          buttonState = BTN_WAITING_RELEASE;
+        }
+      }
+      break;
+  }
 }
 
 void powerDownAndSleep() {
@@ -97,36 +159,7 @@ void loop() {
 
   battery.update(currentMillis);
 
-  if (buttonTriggered) {
-
-    buttonTriggered = false;
-    uint64_t triggerTimestamp = buttonPressMicros;
-
-    unsigned long pressStart = millis();
-    bool isLongPress = false;
-
-    while (digitalRead(BUTTON_PIN) == LOW) {
-      if (millis() - pressStart >= 5000) {
-        isLongPress = true;
-        break;
-      }
-      delay(10);
-    }
-
-    if (isLongPress) {
-      while (digitalRead(BUTTON_PIN) == LOW) {
-        delay(10);
-      }
-      powerDownAndSleep();
-    } else {
-
-      if (currentMillis - lastButtonPress > 200) {
-        lastButtonPress = currentMillis;
-        snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", triggerTimestamp);
-        lora.sendData(timeTriggerStr);
-      }
-    }
-  }
+  handleButtonStateMachine(currentMillis);
 
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
     lastDisplayUpdate = currentMillis;

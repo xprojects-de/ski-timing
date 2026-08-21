@@ -28,6 +28,15 @@ unsigned long lastDisplayUpdate = 0;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 200;
 unsigned long lastButtonPress = 0;
 
+enum ButtonState {
+  BTN_IDLE,
+  BTN_PRESSED,
+  BTN_WAITING_RELEASE
+};
+ButtonState buttonState = BTN_IDLE;
+unsigned long buttonPressStartTime = 0;
+bool shutdownWarningShown = false;
+
 char msg[64];
 int16_t len, rssi;
 int8_t snr;
@@ -52,6 +61,68 @@ void showChipId() {
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
   Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+}
+
+void handleButtonStateMachine(unsigned long currentMillis) {
+
+  switch (buttonState) {
+
+    case BTN_IDLE:
+
+      if (buttonTriggered) {
+        buttonTriggered = false;
+        buttonState = BTN_PRESSED;
+        buttonPressStartTime = currentMillis;
+        shutdownWarningShown = false;
+      }
+
+      break;
+
+    case BTN_PRESSED:
+
+      if (currentMillis - buttonPressStartTime >= 5000) {
+
+        if (!shutdownWarningShown) {
+          dp.clear();
+          dp.setFont(ArialMT_Plain_16);
+          dp.setTextAlignment(TEXT_ALIGN_CENTER);
+          dp.drawString(64, 20, "RELEASE TO");
+          dp.drawString(64, 40, "SHUTDOWN");
+          dp.display();
+          shutdownWarningShown = true;
+        }
+        buttonState = BTN_WAITING_RELEASE;
+      } else if (digitalRead(BUTTON_PIN) == HIGH) {
+
+        unsigned long duration = currentMillis - buttonPressStartTime;
+
+        if (duration >= 2500) {
+          stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
+          stopWatch.reset();
+        } else if (currentMillis - lastButtonPress > 200) {
+          lastButtonPress = currentMillis;
+          stopWatch.triggerFinishWithTimestamp(&fs_instance, buttonPressMicros);
+        }
+
+        buttonState = BTN_IDLE;
+      }
+
+      break;
+
+    case BTN_WAITING_RELEASE:
+      if (digitalRead(BUTTON_PIN) == HIGH) {
+
+        delay(50);
+
+        if (digitalRead(BUTTON_PIN) == HIGH) {
+          powerDownAndSleep();
+        } else {
+          buttonState = BTN_WAITING_RELEASE;
+        }
+      }
+
+      break;
+  }
 }
 
 void powerDownAndSleep() {
@@ -154,44 +225,7 @@ void loop() {
     dp.display();
   }
 
-  if (buttonTriggered) {
-
-    buttonTriggered = false;
-    uint64_t triggerTimestamp = buttonPressMicros;
-
-    unsigned long pressStart = millis();
-
-    while (digitalRead(BUTTON_PIN) == LOW) {
-
-      if (millis() - pressStart >= 5000) {
-
-        while (digitalRead(BUTTON_PIN) == LOW) {
-          delay(10);
-        }
-
-        powerDownAndSleep();
-
-        return;
-      }
-
-      delay(10);
-    }
-
-    unsigned long duration = millis() - pressStart;
-
-    if (duration >= 2500) {
-
-      stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
-      stopWatch.reset();
-
-    } else {
-
-      if (currentMillis - lastButtonPress > 200) {
-        lastButtonPress = currentMillis;
-        stopWatch.triggerFinishWithTimestamp(&fs_instance, triggerTimestamp);
-      }
-    }
-  }
+  handleButtonStateMachine(currentMillis);
 
   if (lora.available()) {
 
