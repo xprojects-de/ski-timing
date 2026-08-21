@@ -26,7 +26,6 @@ volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
 unsigned long lastDisplayUpdate = 0;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
-unsigned long lastButtonPress = 0;
 
 enum ButtonState {
   BTN_IDLE,
@@ -84,7 +83,23 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
     case BTN_PRESSED:
 
-      if (currentMillis - buttonPressStartTime >= 5000) {
+      if (digitalRead(BUTTON_PIN) == HIGH) {
+
+        unsigned long duration = currentMillis - buttonPressStartTime;
+
+        if (duration >= 2500) {
+
+          stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
+          stopWatch.reset();
+          Serial.printf("[BTN] Mode changed to: %s\n", stopWatch.isContinuousMode() ? "Continuous" : "Normal");
+        } else if (duration >= 200) {
+          stopWatch.triggerFinishWithTimestamp(&fs_instance, buttonPressMicros);
+          Serial.println("[BTN] Finish triggered");
+        }
+
+        buttonState = BTN_IDLE;
+
+      } else if (currentMillis - buttonPressStartTime >= 5000) {
 
         if (!shutdownWarningShown) {
           dp.clear();
@@ -94,21 +109,10 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           dp.drawString(64, 40, "SHUTDOWN");
           dp.display();
           shutdownWarningShown = true;
+          Serial.println("[BTN] Shutdown warning shown");
         }
+
         buttonState = BTN_WAITING_RELEASE;
-      } else if (digitalRead(BUTTON_PIN) == HIGH) {
-
-        unsigned long duration = currentMillis - buttonPressStartTime;
-
-        if (duration >= 2500) {
-          stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
-          stopWatch.reset();
-        } else if (currentMillis - lastButtonPress > 200) {
-          lastButtonPress = currentMillis;
-          stopWatch.triggerFinishWithTimestamp(&fs_instance, buttonPressMicros);
-        }
-
-        buttonState = BTN_IDLE;
       }
 
       break;

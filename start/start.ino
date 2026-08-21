@@ -12,7 +12,6 @@ BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
-volatile unsigned long lastButtonPress = 0;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
 
 enum ButtonState {
@@ -68,7 +67,19 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
     case BTN_PRESSED:
 
-      if (currentMillis - buttonPressStartTime >= 5000) {
+      if (digitalRead(BUTTON_PIN) == HIGH) {
+
+        unsigned long duration = currentMillis - buttonPressStartTime;
+
+        if (duration >= 200) {
+          snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", buttonPressMicros);
+          lora.sendData(timeTriggerStr);
+          Serial.printf("[BTN] Start trigger sent: %s\n", timeTriggerStr);
+        }
+
+        buttonState = BTN_IDLE;
+
+      } else if (currentMillis - buttonPressStartTime >= 5000) {
 
         if (!shutdownWarningShown) {
           dp.clear();
@@ -78,21 +89,16 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           dp.drawString(64, 40, "SHUTDOWN");
           dp.display();
           shutdownWarningShown = true;
+          Serial.println("[BTN] Shutdown warning shown");
         }
+
         buttonState = BTN_WAITING_RELEASE;
-      } else if (digitalRead(BUTTON_PIN) == HIGH) {
-
-        if (currentMillis - lastButtonPress > 200) {
-          lastButtonPress = currentMillis;
-          snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", buttonPressMicros);
-          lora.sendData(timeTriggerStr);
-        }
-
-        buttonState = BTN_IDLE;
       }
+
       break;
 
     case BTN_WAITING_RELEASE:
+
       if (digitalRead(BUTTON_PIN) == HIGH) {
 
         delay(50);
@@ -103,8 +109,10 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           buttonState = BTN_WAITING_RELEASE;
         }
       }
+
       break;
   }
+
 }
 
 void powerDownAndSleep() {
