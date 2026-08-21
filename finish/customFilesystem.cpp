@@ -61,18 +61,6 @@ int CFs::getLastId() {
   return lastId;
 }
 
-String CFs::readAll() {
-  if (!_initialized) return "FS not init";
-  if (!LittleFS.exists("/times.csv")) return "";
-
-  File f = LittleFS.open("/times.csv", FILE_READ);
-  if (!f) return "";
-
-  String content = f.readString();
-  f.close();
-
-  return content;
-}
 
 bool CFs::clear() {
   if (!_initialized) return false;
@@ -91,6 +79,7 @@ bool CFs::clear() {
 }
 
 bool CFs::readInChunks(std::function<bool(const char* buffer, size_t length)> chunkCallback) {
+
   if (!_initialized) return false;
   if (!LittleFS.exists("/times.csv")) return false;
 
