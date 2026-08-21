@@ -33,6 +33,7 @@ int16_t _lastRssi = 0;
 int8_t _lastSnr = 0;
 volatile bool _packetReceived = false;
 volatile bool _radioBusy = false;
+volatile bool _rxActive = false;
 
 SemaphoreHandle_t Lora::_dataMutex = NULL;
 QueueHandle_t Lora::_txQueue = NULL;
@@ -152,8 +153,10 @@ void Lora::proccess() {
     char txBuf[BUFFER_SIZE];
     if (_txQueue != NULL && xQueueReceive(_txQueue, txBuf, 0) == pdTRUE) {
       _radioBusy = true;
+      _rxActive = false;
       Radio.Send((uint8_t *)txBuf, strlen(txBuf));
-    } else {
+    } else if (!_rxActive) {
+      _rxActive = true;
       Radio.Rx(0);
     }
   }
@@ -188,20 +191,18 @@ void Lora::OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
 
       xSemaphoreGive(_dataMutex);
     }
-  } else {
-    if (_dataMutex != NULL && xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-      _packetReceived = false;
-      xSemaphoreGive(_dataMutex);
-    }
   }
 
+  _rxActive = false;
   _radioBusy = false;
 }
 
 void Lora::OnRxTimeout() {
+  _rxActive = false;
   _radioBusy = false;
 }
 
 void Lora::OnRxError() {
+  _rxActive = false;
   _radioBusy = false;
 }

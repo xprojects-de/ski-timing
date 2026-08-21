@@ -26,7 +26,7 @@ bool CFs::isInit() {
   return _initialized;
 }
 
-bool CFs::append(float time) {
+bool CFs::append(int64_t time) {
   if (!_initialized) return false;
 
   _lastId++;
@@ -37,7 +37,9 @@ bool CFs::append(float time) {
     return false;
   }
 
-  f.printf("%d,%.2f\n", _lastId, time);
+  // Store time in milliseconds as integer — no float conversion to avoid
+  // precision loss for sessions longer than ~4 hours.
+  f.printf("%d,%lld\n", _lastId, time);
   f.close();
   return true;
 }

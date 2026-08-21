@@ -18,10 +18,12 @@ const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
 enum ButtonState {
   BTN_IDLE,
   BTN_PRESSED,
-  BTN_WAITING_RELEASE
+  BTN_WAITING_RELEASE,
+  BTN_DEBOUNCE_RELEASE
 };
 ButtonState buttonState = BTN_IDLE;
 unsigned long buttonPressStartTime = 0;
+unsigned long buttonReleaseTime = 0;
 
 char timeTriggerStr[32] = "-";
 char syncMsg[32];
@@ -32,7 +34,9 @@ int16_t rxLen;
 int16_t rxRssi;
 int8_t rxSnr;
 
-unsigned long lastSyncTime = -SYNC_INTERVAL_MS;
+// Initialized to trigger the first sync immediately on startup.
+// (unsigned underflow is well-defined in C/C++)
+unsigned long lastSyncTime = (unsigned long)(0UL - SYNC_INTERVAL_MS);
 unsigned long lastDisplayUpdate = 0;
 
 void VextON(void) {
@@ -77,7 +81,11 @@ void handleButtonStateMachine(unsigned long currentMillis) {
         unsigned long duration = currentMillis - buttonPressStartTime;
 
         if (duration >= 30) {
-          snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", buttonPressMicros);
+          // Read 64-bit volatile in a critical section to avoid torn reads
+          noInterrupts();
+          uint64_t capturedMicros = buttonPressMicros;
+          interrupts();
+          snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", capturedMicros);
           lora.sendData(timeTriggerStr);
           Serial.printf("[BTN] Start trigger sent: %s\n", timeTriggerStr);
         }
@@ -93,9 +101,14 @@ void handleButtonStateMachine(unsigned long currentMillis) {
     case BTN_WAITING_RELEASE:
 
       if (digitalRead(BUTTON_PIN) == HIGH) {
+        buttonReleaseTime = currentMillis;
+        buttonState = BTN_DEBOUNCE_RELEASE;
+      }
+      break;
 
-        delay(50);
-
+    case BTN_DEBOUNCE_RELEASE:
+      // Wait 50 ms without blocking, then confirm stable release
+      if (currentMillis - buttonReleaseTime >= 50) {
         if (digitalRead(BUTTON_PIN) == HIGH) {
           powerDownAndSleep();
         } else {

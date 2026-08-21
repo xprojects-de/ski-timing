@@ -73,13 +73,12 @@ String StopWatch::formatTime(int64_t ms) {
 
   if (ms < 0) ms = 0;
 
-  int seconds = ms / 1000;
-  int hundredths = (ms % 1000) / 10;
-  String res = String(seconds) + ".";
-  if (hundredths < 10) res += "0";
-  res += String(hundredths);
-
-  return res;
+  // Use a static buffer to avoid heap allocation on every call
+  static char buf[16];
+  int seconds = (int)(ms / 1000);
+  int hundredths = (int)((ms % 1000) / 10);
+  snprintf(buf, sizeof(buf), "%d.%02d", seconds, hundredths);
+  return String(buf);
 }
 
 String StopWatch::draw() {
@@ -90,12 +89,17 @@ String StopWatch::draw() {
     int64_t currentTime = getSyncedMicros();
     if (currentTime > _startTime) {
       currentElapsed = (currentTime - _startTime) / 1000;
-    } else {
-      currentElapsed = 0;
     }
   }
 
-  return formatTime(_lastTime) + " / " + formatTime(currentElapsed);
+  // Use a static buffer to avoid two String temporaries per call
+  static char drawBuf[32];
+  int lSec = (int)(_lastTime / 1000);
+  int lHun = (int)((_lastTime % 1000) / 10);
+  int cSec = (int)(currentElapsed / 1000);
+  int cHun = (int)((currentElapsed % 1000) / 10);
+  snprintf(drawBuf, sizeof(drawBuf), "%d.%02d / %d.%02d", lSec, lHun, cSec, cHun);
+  return String(drawBuf);
 }
 
 void StopWatch::setContinuousMode(bool continuousMode) {

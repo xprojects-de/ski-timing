@@ -30,10 +30,12 @@ const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
 enum ButtonState {
   BTN_IDLE,
   BTN_PRESSED,
-  BTN_WAITING_RELEASE
+  BTN_WAITING_RELEASE,
+  BTN_DEBOUNCE_RELEASE
 };
 ButtonState buttonState = BTN_IDLE;
 unsigned long buttonPressStartTime = 0;
+unsigned long buttonReleaseTime = 0;
 
 char msg[64];
 int16_t len, rssi;
@@ -93,7 +95,11 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           stopWatch.reset();
           Serial.printf("[BTN] Mode changed to: %s\n", stopWatch.isContinuousMode() ? "Continuous" : "Normal");
         } else if (duration >= 30) {
-          stopWatch.triggerFinishWithTimestamp(&fs_instance, buttonPressMicros);
+          // Read 64-bit volatile in a critical section to avoid torn reads
+          noInterrupts();
+          uint64_t capturedMicros = buttonPressMicros;
+          interrupts();
+          stopWatch.triggerFinishWithTimestamp(&fs_instance, capturedMicros);
           Serial.println("[BTN] Finish triggered");
         }
 
@@ -107,9 +113,14 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
     case BTN_WAITING_RELEASE:
       if (digitalRead(BUTTON_PIN) == HIGH) {
+        buttonReleaseTime = currentMillis;
+        buttonState = BTN_DEBOUNCE_RELEASE;
+      }
+      break;
 
-        delay(50);
-
+    case BTN_DEBOUNCE_RELEASE:
+      // Wait 50 ms without blocking, then confirm stable release
+      if (currentMillis - buttonReleaseTime >= 50) {
         if (digitalRead(BUTTON_PIN) == HIGH) {
           powerDownAndSleep();
         } else {

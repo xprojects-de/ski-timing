@@ -185,11 +185,6 @@ void Lora::OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
 
       xSemaphoreGive(_dataMutex);
     }
-  } else {
-    if (_dataMutex != NULL && xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-      _packetReceived = false;
-      xSemaphoreGive(_dataMutex);
-    }
   }
 
   _rxActive = false;
