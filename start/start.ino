@@ -42,8 +42,10 @@ void VextOFF(void) {
 }
 
 void IRAM_ATTR handleButtonPress() {
-  buttonPressMicros = esp_timer_get_time();
-  buttonTriggered = true;
+  if (!buttonTriggered) {
+    buttonPressMicros = esp_timer_get_time();
+    buttonTriggered = true;
+  }
 }
 
 void showChipId() {
@@ -112,7 +114,6 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
       break;
   }
-
 }
 
 void powerDownAndSleep() {

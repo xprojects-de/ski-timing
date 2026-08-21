@@ -20,7 +20,7 @@
 
 
 #define RX_TIMEOUT_VALUE 1000
-#define BUFFER_SIZE 30
+#define BUFFER_SIZE 64
 
 #define LORA_PREFIX "ST-"
 #define PREFIX_LEN 3

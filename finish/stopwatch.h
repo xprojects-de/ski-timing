@@ -1,5 +1,5 @@
-#ifndef TIME_H
-#define TIME_H
+#ifndef STOPWATCH_H
+#define STOPWATCH_H
 
 #include <Wire.h>
 #include "customFilesystem.h"

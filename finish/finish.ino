@@ -45,8 +45,10 @@ char uptimeStr[32];
 char timeStr[32];
 
 void IRAM_ATTR handleButtonPress() {
-  buttonPressMicros = esp_timer_get_time();
-  buttonTriggered = true;
+  if (!buttonTriggered) {
+    buttonPressMicros = esp_timer_get_time();
+    buttonTriggered = true;
+  }
 }
 
 void VextON(void) {
