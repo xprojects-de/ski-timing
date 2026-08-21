@@ -25,7 +25,7 @@ BatteryCheck battery;
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
 unsigned long lastDisplayUpdate = 0;
-const unsigned long DISPLAY_UPDATE_INTERVAL = 200;
+const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
 unsigned long lastButtonPress = 0;
 
 enum ButtonState {
@@ -40,6 +40,10 @@ bool shutdownWarningShown = false;
 char msg[64];
 int16_t len, rssi;
 int8_t snr;
+
+char batteryStr[8];
+char uptimeStr[32];
+char timeStr[32];
 
 void IRAM_ATTR handleButtonPress() {
   buttonPressMicros = esp_timer_get_time();
@@ -192,6 +196,15 @@ void loop() {
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
     lastDisplayUpdate = currentMillis;
 
+    snprintf(batteryStr, sizeof(batteryStr), "%d%%", battery.getPercentage());
+    snprintf(timeStr, sizeof(timeStr), "%s", stopWatch.draw().c_str());
+
+    if (timeSync.isInit()) {
+      snprintf(uptimeStr, sizeof(uptimeStr), "sync - Up: %lus", currentMillis / 1000);
+    } else {
+      snprintf(uptimeStr, sizeof(uptimeStr), "Up: %lus", currentMillis / 1000);
+    }
+
     dp.clear();
 
     dp.setTextAlignment(TEXT_ALIGN_LEFT);
@@ -205,22 +218,17 @@ void loop() {
 
     dp.setTextAlignment(TEXT_ALIGN_RIGHT);
     dp.setFont(ArialMT_Plain_10);
-    dp.drawString(128, 0, String(battery.getPercentage()) + "%");
+    dp.drawString(128, 0, batteryStr);
 
     dp.setTextAlignment(TEXT_ALIGN_CENTER);
     dp.setFont(ArialMT_Plain_10);
-    dp.drawString(64, 25, stopWatch.draw());
+    dp.drawString(64, 25, timeStr);
 
     dp.setTextAlignment(TEXT_ALIGN_LEFT);
     dp.setFont(ArialMT_Plain_10);
+    dp.drawString(0, 54, uptimeStr);
 
-    if (timeSync.isInit()) {
-      dp.drawString(0, 54, "synced - UpTime: " + String(currentMillis / 1000) + "s");
-      digitalWrite(SYNC_LED_PIN, HIGH);
-    } else {
-      dp.drawString(0, 54, "UpTime: " + String(currentMillis / 1000) + "s");
-      digitalWrite(SYNC_LED_PIN, LOW);
-    }
+    digitalWrite(SYNC_LED_PIN, timeSync.isInit() ? HIGH : LOW);
 
     dp.display();
   }

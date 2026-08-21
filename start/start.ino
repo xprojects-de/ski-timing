@@ -13,7 +13,7 @@ BatteryCheck battery;
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
 volatile unsigned long lastButtonPress = 0;
-const unsigned long DISPLAY_UPDATE_INTERVAL = 200;
+const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
 
 enum ButtonState {
   BTN_IDLE,
@@ -27,6 +27,7 @@ bool shutdownWarningShown = false;
 char timeTriggerStr[32] = "-";
 char syncMsg[32];
 char uptimeStr[32];
+char batteryStr[8];
 
 unsigned long lastSyncTime = -SYNC_INTERVAL_MS;
 unsigned long lastDisplayUpdate = 0;
@@ -165,6 +166,7 @@ void loop() {
     lastDisplayUpdate = currentMillis;
 
     snprintf(uptimeStr, sizeof(uptimeStr), "UpTime: %lus", currentMillis / 1000);
+    snprintf(batteryStr, sizeof(batteryStr), "%d%%", battery.getPercentage());
 
     dp.clear();
 
@@ -174,7 +176,7 @@ void loop() {
 
     dp.setTextAlignment(TEXT_ALIGN_RIGHT);
     dp.setFont(ArialMT_Plain_10);
-    dp.drawString(128, 0, String(battery.getPercentage()) + "%");
+    dp.drawString(128, 0, batteryStr);
 
     dp.setTextAlignment(TEXT_ALIGN_CENTER);
     dp.setFont(ArialMT_Plain_10);
