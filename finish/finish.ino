@@ -8,6 +8,7 @@
 #include "timesync.h"
 #include "batteryCheck.h"
 #include <WiFi.h>
+#include <esp_timer.h>
 
 #define BUTTON_PIN 0
 #define SYNC_LED_PIN 35
@@ -22,6 +23,7 @@ Timesync timeSync;
 BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
+volatile uint64_t buttonPressMicros = 0;
 unsigned long lastDisplayUpdate = 0;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 200;
 unsigned long lastButtonPress = 0;
@@ -31,6 +33,7 @@ int16_t len, rssi;
 int8_t snr;
 
 void IRAM_ATTR handleButtonPress() {
+  buttonPressMicros = esp_timer_get_time();
   buttonTriggered = true;
 }
 
@@ -154,6 +157,7 @@ void loop() {
   if (buttonTriggered) {
 
     buttonTriggered = false;
+    uint64_t triggerTimestamp = buttonPressMicros;
 
     unsigned long pressStart = millis();
 
@@ -184,7 +188,7 @@ void loop() {
 
       if (currentMillis - lastButtonPress > 200) {
         lastButtonPress = currentMillis;
-        stopWatch.triggerFinish(&fs_instance);
+        stopWatch.triggerFinishWithTimestamp(&fs_instance, triggerTimestamp);
       }
     }
   }

@@ -33,6 +33,7 @@ void VextOFF(void) {
 }
 
 void IRAM_ATTR handleButtonPress() {
+  buttonPressMicros = esp_timer_get_time();
   buttonTriggered = true;
 }
 
@@ -99,6 +100,7 @@ void loop() {
   if (buttonTriggered) {
 
     buttonTriggered = false;
+    uint64_t triggerTimestamp = buttonPressMicros;
 
     unsigned long pressStart = millis();
     bool isLongPress = false;
@@ -120,7 +122,7 @@ void loop() {
 
       if (currentMillis - lastButtonPress > 200) {
         lastButtonPress = currentMillis;
-        snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%lu", micros());
+        snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", triggerTimestamp);
         lora.sendData(timeTriggerStr);
       }
     }
@@ -155,7 +157,7 @@ void loop() {
   if (currentMillis - lastSyncTime >= SYNC_INTERVAL_MS) {
     lastSyncTime = currentMillis;
 
-    snprintf(syncMsg, sizeof(syncMsg), "sync:%llu", (uint64_t)micros());
+    snprintf(syncMsg, sizeof(syncMsg), "sync:%llu", (uint64_t)esp_timer_get_time());
     lora.sendData(syncMsg);
     Serial.printf("send sync: %s\n", syncMsg);
   }

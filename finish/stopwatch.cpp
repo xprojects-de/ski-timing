@@ -15,7 +15,7 @@ void StopWatch::setOffset(int64_t offset) {
 }
 
 int64_t StopWatch::getSyncedMicros() {
-  return (int64_t)((int64_t)micros() + _offset);
+  return (int64_t)((int64_t)esp_timer_get_time() + _offset);
 }
 
 void StopWatch::triggerStart(uint64_t time) {
@@ -28,18 +28,21 @@ void StopWatch::triggerStart(uint64_t time) {
 }
 
 void StopWatch::triggerFinish(CFs* fs_instance) {
+  triggerFinishWithTimestamp(fs_instance, (uint64_t)getSyncedMicros());
+}
+
+void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp) {
 
   if (_isContinuousMode) {
 
     if (!_isRunning) {
 
-      _startTime = getSyncedMicros();
+      _startTime = (int64_t)timestamp;
       _isRunning = true;
 
     } else {
 
-      int64_t currentTime = getSyncedMicros();
-      int64_t elapsed = (int64_t)(currentTime - _startTime);
+      int64_t elapsed = (int64_t)((int64_t)timestamp - _startTime);
 
       _lastTime = (int64_t)(elapsed / 1000);
 
@@ -50,8 +53,7 @@ void StopWatch::triggerFinish(CFs* fs_instance) {
 
     if (!_isRunning) return;
 
-    int64_t currentTime = getSyncedMicros();
-    int64_t elapsed = (int64_t)(currentTime - _startTime);
+    int64_t elapsed = (int64_t)((int64_t)timestamp - _startTime);
 
     _lastTime = (int64_t)(elapsed / 1000);
     _isRunning = false;

@@ -25,7 +25,7 @@ void Timesync::syncTime(uint64_t remoteTime, StopWatch* stopWatch) {
     return;
   }
 
-  int64_t localTime = micros();
+  int64_t localTime = esp_timer_get_time();
   int64_t offset = (int64_t)(remoteTime - localTime);
   _totalOffset += offset;
   _timeSyncReceived++;
