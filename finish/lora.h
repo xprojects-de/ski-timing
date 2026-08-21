@@ -3,6 +3,7 @@
 
 #include "LoRaWan_APP.h"
 #include <freertos/semphr.h>
+#include <freertos/queue.h>
 #include <esp_timer.h>
 
 class Lora {
@@ -10,6 +11,7 @@ class Lora {
 private:
   TaskHandle_t _taskHandle = NULL;
   static SemaphoreHandle_t _dataMutex;
+  static QueueHandle_t _txQueue;          // Thread-safe TX queue
   static volatile uint64_t _rxTimestamp;  // µs timestamp of last received packet (OnRxDone)
 
 public:
