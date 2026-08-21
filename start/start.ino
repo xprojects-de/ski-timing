@@ -165,7 +165,7 @@ void loop() {
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
     lastDisplayUpdate = currentMillis;
 
-    snprintf(uptimeStr, sizeof(uptimeStr), "UpTime: %lus", currentMillis / 1000);
+    snprintf(uptimeStr, sizeof(uptimeStr), "Up: %lus", currentMillis / 1000);
     snprintf(batteryStr, sizeof(batteryStr), "%d%%", battery.getPercentage());
 
     dp.clear();

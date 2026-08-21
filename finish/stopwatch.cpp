@@ -33,18 +33,24 @@ void StopWatch::triggerFinish(CFs* fs_instance) {
 
 void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp) {
 
+  // Convert the finish-local timestamp into the start device's time domain
+  // by applying the sync offset (same transformation as getSyncedMicros()).
+  // Without this, elapsed = finishLocal - startRemote = garbage when devices
+  // were booted at different times.
+  const int64_t syncedTimestamp = (int64_t)timestamp + _offset;
+
   if (_isContinuousMode) {
 
     if (!_isRunning) {
 
-      _startTime = (int64_t)timestamp;
+      _startTime = syncedTimestamp;
       _isRunning = true;
 
     } else {
 
-      int64_t elapsed = (int64_t)((int64_t)timestamp - _startTime);
+      int64_t elapsed = syncedTimestamp - _startTime;
 
-      _lastTime = (int64_t)(elapsed / 1000);
+      _lastTime = elapsed / 1000;
 
       fs_instance->append(_lastTime);
     }
@@ -53,9 +59,9 @@ void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp)
 
     if (!_isRunning) return;
 
-    int64_t elapsed = (int64_t)((int64_t)timestamp - _startTime);
+    int64_t elapsed = syncedTimestamp - _startTime;
 
-    _lastTime = (int64_t)(elapsed / 1000);
+    _lastTime = elapsed / 1000;
     _isRunning = false;
     _startTime = 0;
 
