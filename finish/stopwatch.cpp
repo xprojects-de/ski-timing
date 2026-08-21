@@ -1,11 +1,11 @@
 #include "stopwatch.h"
 
-// Konstruktor: Initialisiert die Werte
 StopWatch::StopWatch() {
   _startTime = 0;
   _lastTime = 0;
   _isRunning = false;
   _offset = 0;
+  _isContinuousMode = false;
 }
 
 StopWatch::~StopWatch() {}
@@ -27,18 +27,38 @@ void StopWatch::triggerStart(uint64_t time) {
   }
 }
 
-void StopWatch::triggerFinish(Fs* fs_instance) {
+void StopWatch::triggerFinish(CFs* fs_instance) {
 
-  if (!_isRunning) return;
+  if (_isContinuousMode) {
 
-  int64_t currentTime = getSyncedMicros();
-  int64_t elapsed = (int64_t)(currentTime - _startTime);
+    if (!_isRunning) {
 
-  _lastTime = (int64_t)(elapsed / 1000);
-  _isRunning = false;
-  _startTime = 0;
+      _startTime = getSyncedMicros();
+      _isRunning = true;
 
-  fs_instance->append(_lastTime);
+    } else {
+
+      int64_t currentTime = getSyncedMicros();
+      int64_t elapsed = (int64_t)(currentTime - _startTime);
+
+      _lastTime = (int64_t)(elapsed / 1000);
+
+      fs_instance->append(_lastTime);
+    }
+
+  } else {
+
+    if (!_isRunning) return;
+
+    int64_t currentTime = getSyncedMicros();
+    int64_t elapsed = (int64_t)(currentTime - _startTime);
+
+    _lastTime = (int64_t)(elapsed / 1000);
+    _isRunning = false;
+    _startTime = 0;
+
+    fs_instance->append(_lastTime);
+  }
 }
 
 String StopWatch::formatTime(int64_t ms) {
@@ -68,4 +88,20 @@ String StopWatch::draw() {
   }
 
   return formatTime(_lastTime) + " / " + formatTime(currentElapsed);
+}
+
+void StopWatch::setContinuousMode(bool continuousMode) {
+  _isContinuousMode = continuousMode;
+}
+
+bool StopWatch::isContinuousMode() {
+  return _isContinuousMode;
+}
+
+bool StopWatch::reset() {
+  _lastTime = 0;
+  _isRunning = false;
+  _startTime = 0;
+
+  return true;
 }

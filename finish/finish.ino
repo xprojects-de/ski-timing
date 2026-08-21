@@ -1,12 +1,13 @@
-// For a connection via I2C using the Arduino Wire include:
 #include <Wire.h>
 #include "stopwatch.h"
 #include "display.h"
 #include "lora.h"
 #include "accesspoint.h"
-#include "webserver.h"
-#include "fs.h"
+#include "customWebserver.h"
+#include "customFilesystem.h"
 #include "timesync.h"
+#include "batteryCheck.h"
+#include <WiFi.h>
 
 #define BUTTON_PIN 0
 #define SYNC_LED_PIN 35
@@ -15,11 +16,15 @@ StopWatch stopWatch;
 Display dp;
 Lora lora;
 AccessPoint accessPoint;
-Webserver webserver;
-Fs fs;
+CustomWebserver webserver;
+CFs fs_instance;
 Timesync timeSync;
+BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
+unsigned long lastDisplayUpdate = 0;
+const unsigned long DISPLAY_UPDATE_INTERVAL = 200;
+unsigned long lastButtonPress = 0;
 
 char msg[64];
 int16_t len, rssi;
@@ -29,89 +34,162 @@ void IRAM_ATTR handleButtonPress() {
   buttonTriggered = true;
 }
 
-void showChipId() {
+void VextON(void) {
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, LOW);
+}
 
-  // Licence
-  // https://resource.heltec.cn/search
+void VextOFF(void) {
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, HIGH);
+}
+
+void showChipId() {
   uint64_t chipId = ESP.getEfuseMac();
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
-  Serial.printf("ESP32ChipID=%04X", (uint16_t)(chipId >> 32));
-  Serial.printf("%08X\r\n", (uint32_t)chipId);
+  Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+}
+
+void powerDownAndSleep() {
+
+  Serial.println("\n[POWER] Shutdown startet...");
+
+  dp.clear();
+  dp.setFont(ArialMT_Plain_16);
+  dp.setTextAlignment(TEXT_ALIGN_CENTER);
+  dp.drawString(64, 20, "SHUTDOWN...");
+  dp.display();
+  delay(1000);
+
+  detachInterrupt(BUTTON_PIN);
+
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+
+  digitalWrite(SYNC_LED_PIN, LOW);
+  dp.clear();
+  dp.display();
+
+  VextOFF();
+
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_PIN, 0);
+
+  Serial.println("[POWER] Go to sleep.");
+  Serial.flush();
+
+  esp_deep_sleep_start();
 }
 
 void setup() {
-
   Serial.begin(115200);
-  Serial.println();
-  Serial.println();
+  Serial.println("\n\n--- SKI TIMING FINISH ---");
+
+  VextON();
+  delay(50);
 
   showChipId();
 
-  lora.preInit();
-
-  VextON();
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
 
   pinMode(SYNC_LED_PIN, OUTPUT);
   digitalWrite(SYNC_LED_PIN, LOW);
 
-  delay(100);
-
+  lora.preInit();
   dp.init();
   lora.init();
+  lora.startTask();
+
   accessPoint.init();
-  fs.init();
-  webserver.init(&fs);
+  fs_instance.init();
+  webserver.init(&fs_instance, &stopWatch);
+
+  battery.init();
 
   dp.setFont(ArialMT_Plain_10);
-}
-
-void VextON(void) {
-  pinMode(Vext, OUTPUT);
-  digitalWrite(Vext, LOW);
-}
-
-void VextOFF(void)  //Vext default OFF
-{
-  pinMode(Vext, OUTPUT);
-  digitalWrite(Vext, HIGH);
 }
 
 void loop() {
+  unsigned long currentMillis = millis();
 
-  dp.clear();
+  battery.update(currentMillis);
 
-  dp.setTextAlignment(TEXT_ALIGN_LEFT);
-  dp.setFont(ArialMT_Plain_16);
-  dp.drawString(0, 0, "FINISH");
+  if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
+    lastDisplayUpdate = currentMillis;
 
-  dp.setTextAlignment(TEXT_ALIGN_CENTER);
-  dp.setFont(ArialMT_Plain_16);
-  dp.drawString(64, 25, stopWatch.draw());
+    dp.clear();
 
-  dp.setTextAlignment(TEXT_ALIGN_LEFT);
-  dp.setFont(ArialMT_Plain_10);
+    dp.setTextAlignment(TEXT_ALIGN_LEFT);
+    dp.setFont(ArialMT_Plain_16);
 
-  if (timeSync.isInit()) {
-    dp.drawString(0, 54, "synced - UpTime: " + String(millis() / 1000) + "s");
-    digitalWrite(SYNC_LED_PIN, HIGH);
-  } else {
-    dp.drawString(0, 54, "UpTime: " + String(millis() / 1000) + "s");
-    digitalWrite(SYNC_LED_PIN, LOW);
+    if (stopWatch.isContinuousMode()) {
+      dp.drawString(0, 0, "FINISH (C)");
+    } else {
+      dp.drawString(0, 0, "FINISH (N)");
+    }
+
+    dp.setTextAlignment(TEXT_ALIGN_RIGHT);
+    dp.setFont(ArialMT_Plain_10);
+    dp.drawString(128, 0, String(battery.getPercentage()) + "%");
+
+    dp.setTextAlignment(TEXT_ALIGN_CENTER);
+    dp.setFont(ArialMT_Plain_10);
+    dp.drawString(64, 25, stopWatch.draw());
+
+    dp.setTextAlignment(TEXT_ALIGN_LEFT);
+    dp.setFont(ArialMT_Plain_10);
+
+    if (timeSync.isInit()) {
+      dp.drawString(0, 54, "synced - UpTime: " + String(currentMillis / 1000) + "s");
+      digitalWrite(SYNC_LED_PIN, HIGH);
+    } else {
+      dp.drawString(0, 54, "UpTime: " + String(currentMillis / 1000) + "s");
+      digitalWrite(SYNC_LED_PIN, LOW);
+    }
+
+    dp.display();
   }
 
-  dp.display();
+  if (buttonTriggered) {
 
-  if (buttonTriggered == true) {
     buttonTriggered = false;
-    stopWatch.triggerFinish(&fs);
+
+    unsigned long pressStart = millis();
+
+    while (digitalRead(BUTTON_PIN) == LOW) {
+
+      if (millis() - pressStart >= 5000) {
+
+        while (digitalRead(BUTTON_PIN) == LOW) {
+          delay(10);
+        }
+
+        powerDownAndSleep();
+
+        return;
+      }
+
+      delay(10);
+    }
+
+    unsigned long duration = millis() - pressStart;
+
+    if (duration >= 2500) {
+
+      stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
+      stopWatch.reset();
+
+    } else {
+
+      if (currentMillis - lastButtonPress > 200) {
+        lastButtonPress = currentMillis;
+        stopWatch.triggerFinish(&fs_instance);
+      }
+    }
   }
 
-  lora.proccess();
-
-  if (lora.available() == true) {
+  if (lora.available()) {
 
     lora.getPacket(msg, len, rssi, snr);
 
@@ -120,11 +198,12 @@ void loop() {
     if (strncmp(msg, "sync:", 5) == 0) {
       timeSync.syncTime(atoll(&msg[5]), &stopWatch);
     } else {
+
       if (timeSync.isInit()) {
         stopWatch.triggerStart(atoll(msg));
       }
     }
   }
 
-  delay(5);
+  vTaskDelay(1);
 }

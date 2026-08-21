@@ -2,7 +2,7 @@
 #define TIME_H
 
 #include <Wire.h>
-#include "fs.h"
+#include "customFilesystem.h"
 
 class StopWatch {
 
@@ -11,6 +11,7 @@ private:
   int64_t _lastTime;
   bool _isRunning;
   int64_t _offset;
+  bool _isContinuousMode;
 
 public:
   StopWatch();
@@ -19,8 +20,11 @@ public:
   void setOffset(int64_t offset);
   int64_t getSyncedMicros();
   void triggerStart(uint64_t time);
-  void triggerFinish(Fs* fs_instance);
+  void triggerFinish(CFs* fs_instance);
   String draw();
+  void setContinuousMode(bool continuousMode);
+  bool isContinuousMode();
+  bool reset();
 
   static String formatTime(int64_t ms);
 };

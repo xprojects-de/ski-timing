@@ -20,35 +20,73 @@ const char index_html[] PROGMEM = R"rawliteral(
         </table>
 
     <script>
+        let isUpdating = false;  // Flag um mehrfache gleichzeitige Requests zu verhindern
+
         function updateTable() {
-          fetch('/data')
-            .then(response => response.text())
+          // Verhindere mehrfache parallele Requests
+          if (isUpdating) {
+            console.log("Update already in progress, skipping...");
+            return;
+          }
+
+          isUpdating = true;
+
+          // Timeout für fetch() - bricht Request nach 5 Sekunden ab
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+          fetch('/data', { signal: controller.signal })
+            .then(response => {
+              clearTimeout(timeoutId);
+              return response.text();
+            })
             .then(csv => {
               let lines = csv.trim().split('\n').filter(line => line.length > 0);
               
               let tableHTML = "<thead><tr><th>Nr.</th><th>Zeit (s)</th></tr></thead><tbody>";
               
               for (let i = lines.length - 1; i >= 0; i--) {
-                let rawValue = lines[i].trim();
-                if (rawValue === "") continue;
+                let line = lines[i].trim();
+                if (line === "") continue;
 
-                let floatTime = parseFloat(rawValue);
-                floatTime = floatTime / 1000.0; 
+                // Parse CSV format: id,time
+                let parts = line.split(',');
+                if (parts.length >= 2) {
+                  let runNumber = parts[0];
+                  let floatTime = parseFloat(parts[1]);
+                  floatTime = floatTime / 1000.0;
+                  let formattedTime = isNaN(floatTime) ? parts[1] : floatTime.toFixed(2);
 
-                let formattedTime = isNaN(floatTime) ? rawValue : floatTime.toFixed(2);
-                let runNumber = i + 1;
+                  tableHTML += "<tr><td>" + runNumber + "</td><td><strong>" + formattedTime + " s</strong></td></tr>";
+                } else {
+                  // Fallback für altes Format (nur Zeit)
+                  let floatTime = parseFloat(line);
+                  floatTime = floatTime / 1000.0;
+                  let formattedTime = isNaN(floatTime) ? line : floatTime.toFixed(2);
+                  let runNumber = i + 1;
 
-                tableHTML += "<tr><td>" + runNumber + "</td><td><strong>" + formattedTime + " s</strong></td></tr>";
+                  tableHTML += "<tr><td>" + runNumber + "</td><td><strong>" + formattedTime + " s</strong></td></tr>";
+                }
               }
               
               tableHTML += "</tbody>";
               document.getElementById('results').innerHTML = tableHTML;
             })
-            .catch(err => console.error("Update Fehler:", err));
+            .catch(err => {
+              if (err.name === 'AbortError') {
+                console.error("Request timeout nach 5s");
+              } else {
+                console.error("Update Fehler:", err);
+              }
+            })
+            .finally(() => {
+              clearTimeout(timeoutId);
+              isUpdating = false;
+            });
         }
 
-        setInterval(updateTable, 2000);
-        updateTable(); // Sofort-Start
+        setInterval(updateTable, 3000);
+        updateTable();
     </script>
 </body>
 </html>

@@ -1,59 +1,26 @@
-// For a connection via I2C using the Arduino Wire include:
 #include <Wire.h>
 #include "display.h"
 #include "lora.h"
+#include "batteryCheck.h"
 
 #define BUTTON_PIN 0
 #define SYNC_INTERVAL_MS 5000
 
 Display dp;
 Lora lora;
+BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
-char timeTrigger[30];
-unsigned long lastSyncTime = -5000;
+volatile unsigned long lastButtonPress = 0;
+volatile unsigned long buttonPressMicros = 0;
+const unsigned long DISPLAY_UPDATE_INTERVAL = 200;
+
+char timeTriggerStr[32] = "-";
 char syncMsg[32];
+char uptimeStr[32];
 
-void IRAM_ATTR handleButtonPress() {
-  snprintf(timeTrigger, sizeof(timeTrigger), "%lu", micros());
-  buttonTriggered = true;
-}
-
-void showChipId() {
-
-  // Licence
-  // https://resource.heltec.cn/search
-  uint64_t chipId = ESP.getEfuseMac();
-  Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
-  Serial.printf("This chip has %d cores\n", ESP.getChipCores());
-  Serial.printf("ESP32ChipID=%04X", (uint16_t)(chipId >> 32));
-  Serial.printf("%08X\r\n", (uint32_t)chipId);
-}
-
-void setup() {
-
-  Serial.begin(115200);
-  Serial.println();
-  Serial.println();
-
-  showChipId();
-
-  lora.preInit();
-
-  VextON();
-
-  delay(100);
-
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
-
-  dp.init();
-  lora.init();
-
-  snprintf(timeTrigger, sizeof(timeTrigger), "-");
-
-  dp.setFont(ArialMT_Plain_10);
-}
+unsigned long lastSyncTime = -SYNC_INTERVAL_MS;
+unsigned long lastDisplayUpdate = 0;
 
 void VextON(void) {
   pinMode(Vext, OUTPUT);
@@ -65,41 +32,133 @@ void VextOFF(void) {
   digitalWrite(Vext, HIGH);
 }
 
-void loop() {
+void IRAM_ATTR handleButtonPress() {
+  buttonTriggered = true;
+}
+
+void showChipId() {
+  uint64_t chipId = ESP.getEfuseMac();
+  Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
+  Serial.printf("This chip has %d cores\n", ESP.getChipCores());
+  Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+}
+
+void powerDownAndSleep() {
+
+  Serial.println("\n[POWER] Shutdown startet...");
 
   dp.clear();
-
-  dp.setTextAlignment(TEXT_ALIGN_LEFT);
   dp.setFont(ArialMT_Plain_16);
-  dp.drawString(0, 0, "START");
-
   dp.setTextAlignment(TEXT_ALIGN_CENTER);
-  dp.setFont(ArialMT_Plain_16);
-  dp.drawString(64, 25, String(timeTrigger));
+  dp.drawString(64, 20, "SHUTDOWN...");
+  dp.display();
+  delay(1000);
 
-  dp.setTextAlignment(TEXT_ALIGN_LEFT);
-  dp.setFont(ArialMT_Plain_10);
-  dp.drawString(0, 54, "UpTime: " + String(millis() / 1000) + "s");
+  detachInterrupt(BUTTON_PIN);
 
+  dp.clear();
   dp.display();
 
-  if (buttonTriggered == true) {
+  VextOFF();
+
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_PIN, 0);
+
+  Serial.println("[POWER] Gehe in Deep Sleep.");
+  Serial.flush();
+
+  esp_deep_sleep_start();
+}
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println();
+
+  showChipId();
+
+  lora.preInit();
+  VextON();
+  delay(100);
+
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
+
+  dp.init();
+  battery.init();
+  lora.init();
+  lora.startTask();
+
+  dp.setFont(ArialMT_Plain_10);
+}
+
+void loop() {
+
+  unsigned long currentMillis = millis();
+
+  battery.update(currentMillis);
+
+  if (buttonTriggered) {
 
     buttonTriggered = false;
-    lora.sendData(timeTrigger);
-    delay(5);
+
+    unsigned long pressStart = millis();
+    bool isLongPress = false;
+
+    while (digitalRead(BUTTON_PIN) == LOW) {
+      if (millis() - pressStart >= 5000) {
+        isLongPress = true;
+        break;
+      }
+      delay(10);
+    }
+
+    if (isLongPress) {
+      while (digitalRead(BUTTON_PIN) == LOW) {
+        delay(10);
+      }
+      powerDownAndSleep();
+    } else {
+
+      if (currentMillis - lastButtonPress > 200) {
+        lastButtonPress = currentMillis;
+        snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%lu", micros());
+        lora.sendData(timeTriggerStr);
+      }
+    }
   }
 
-  if (millis() - lastSyncTime >= SYNC_INTERVAL_MS) {
-    lastSyncTime = millis();
+  if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
+    lastDisplayUpdate = currentMillis;
+
+    snprintf(uptimeStr, sizeof(uptimeStr), "UpTime: %lus", currentMillis / 1000);
+
+    dp.clear();
+
+    dp.setTextAlignment(TEXT_ALIGN_LEFT);
+    dp.setFont(ArialMT_Plain_16);
+    dp.drawString(0, 0, "START");
+
+    dp.setTextAlignment(TEXT_ALIGN_RIGHT);
+    dp.setFont(ArialMT_Plain_10);
+    dp.drawString(128, 0, String(battery.getPercentage()) + "%");
+
+    dp.setTextAlignment(TEXT_ALIGN_CENTER);
+    dp.setFont(ArialMT_Plain_10);
+    dp.drawString(64, 25, timeTriggerStr);
+
+    dp.setTextAlignment(TEXT_ALIGN_LEFT);
+    dp.setFont(ArialMT_Plain_10);
+    dp.drawString(0, 54, uptimeStr);
+
+    dp.display();
+  }
+
+  if (currentMillis - lastSyncTime >= SYNC_INTERVAL_MS) {
+    lastSyncTime = currentMillis;
 
     snprintf(syncMsg, sizeof(syncMsg), "sync:%llu", (uint64_t)micros());
     lora.sendData(syncMsg);
     Serial.printf("send sync: %s\n", syncMsg);
-    delay(5);
   }
 
-  lora.proccess();
-
-  delay(5);
+  vTaskDelay(1);
 }

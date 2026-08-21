@@ -6,6 +6,7 @@
 class Lora {
 
 private:
+  TaskHandle_t _taskHandle = NULL;
 
 public:
   Lora();
@@ -13,6 +14,7 @@ public:
 
   void preInit();
   void init();
+  void startTask(UBaseType_t priority = 2, BaseType_t coreID = 1);
   void proccess();
 
   void sendData(const char* data);
