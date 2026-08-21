@@ -22,7 +22,6 @@ enum ButtonState {
 };
 ButtonState buttonState = BTN_IDLE;
 unsigned long buttonPressStartTime = 0;
-bool shutdownWarningShown = false;
 
 char timeTriggerStr[32] = "-";
 char syncMsg[32];
@@ -68,7 +67,6 @@ void handleButtonStateMachine(unsigned long currentMillis) {
         buttonTriggered = false;
         buttonState = BTN_PRESSED;
         buttonPressStartTime = currentMillis;
-        shutdownWarningShown = false;
       }
       break;
 
@@ -78,7 +76,7 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
         unsigned long duration = currentMillis - buttonPressStartTime;
 
-        if (duration >= 200) {
+        if (duration >= 30) {
           snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", buttonPressMicros);
           lora.sendData(timeTriggerStr);
           Serial.printf("[BTN] Start trigger sent: %s\n", timeTriggerStr);
@@ -87,18 +85,6 @@ void handleButtonStateMachine(unsigned long currentMillis) {
         buttonState = BTN_IDLE;
 
       } else if (currentMillis - buttonPressStartTime >= 5000) {
-
-        if (!shutdownWarningShown) {
-          dp.clear();
-          dp.setFont(ArialMT_Plain_16);
-          dp.setTextAlignment(TEXT_ALIGN_CENTER);
-          dp.drawString(64, 20, "RELEASE TO");
-          dp.drawString(64, 40, "SHUTDOWN");
-          dp.display();
-          shutdownWarningShown = true;
-          Serial.println("[BTN] Shutdown warning shown");
-        }
-
         buttonState = BTN_WAITING_RELEASE;
       }
 

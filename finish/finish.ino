@@ -34,7 +34,6 @@ enum ButtonState {
 };
 ButtonState buttonState = BTN_IDLE;
 unsigned long buttonPressStartTime = 0;
-bool shutdownWarningShown = false;
 
 char msg[64];
 int16_t len, rssi;
@@ -78,7 +77,6 @@ void handleButtonStateMachine(unsigned long currentMillis) {
         buttonTriggered = false;
         buttonState = BTN_PRESSED;
         buttonPressStartTime = currentMillis;
-        shutdownWarningShown = false;
       }
 
       break;
@@ -94,7 +92,7 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
           stopWatch.reset();
           Serial.printf("[BTN] Mode changed to: %s\n", stopWatch.isContinuousMode() ? "Continuous" : "Normal");
-        } else if (duration >= 200) {
+        } else if (duration >= 30) {
           stopWatch.triggerFinishWithTimestamp(&fs_instance, buttonPressMicros);
           Serial.println("[BTN] Finish triggered");
         }
@@ -102,18 +100,6 @@ void handleButtonStateMachine(unsigned long currentMillis) {
         buttonState = BTN_IDLE;
 
       } else if (currentMillis - buttonPressStartTime >= 5000) {
-
-        if (!shutdownWarningShown) {
-          dp.clear();
-          dp.setFont(ArialMT_Plain_16);
-          dp.setTextAlignment(TEXT_ALIGN_CENTER);
-          dp.drawString(64, 20, "RELEASE TO");
-          dp.drawString(64, 40, "SHUTDOWN");
-          dp.display();
-          shutdownWarningShown = true;
-          Serial.println("[BTN] Shutdown warning shown");
-        }
-
         buttonState = BTN_WAITING_RELEASE;
       }
 
