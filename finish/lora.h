@@ -2,11 +2,17 @@
 #define LORA_H
 
 #include "LoRaWan_APP.h"
+#include <freertos/semphr.h>
+#include <freertos/queue.h>
+#include <esp_timer.h>
 
 class Lora {
 
 private:
   TaskHandle_t _taskHandle = NULL;
+  static SemaphoreHandle_t _dataMutex;
+  static QueueHandle_t _txQueue;          // Thread-safe TX queue
+  static volatile uint64_t _rxTimestamp;  // µs timestamp of last received packet (OnRxDone)
 
 public:
   Lora();
@@ -19,8 +25,13 @@ public:
 
   void sendData(const char* data);
 
-  bool available();
-  void getPacket(char* buffer, int16_t& size, int16_t& rssi, int8_t& snr);
+  bool tryGetPacket(char* buffer, size_t bufferSize, int16_t& size, int16_t& rssi, int8_t& snr);
+
+  // Returns the esp_timer timestamp captured at the start of OnRxDone.
+  // Use this for precise receive-time measurements (RTT-sync).
+  static uint64_t getRxTimestamp() {
+    return _rxTimestamp;
+  }
 
   static void OnTxDone();
   static void OnTxTimeout();

@@ -1,5 +1,5 @@
-#ifndef TIME_H
-#define TIME_H
+#ifndef STOPWATCH_H
+#define STOPWATCH_H
 
 #include <Wire.h>
 #include "customFilesystem.h"
@@ -21,6 +21,7 @@ public:
   int64_t getSyncedMicros();
   void triggerStart(uint64_t time);
   void triggerFinish(CFs* fs_instance);
+  void triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp);
   String draw();
   void setContinuousMode(bool continuousMode);
   bool isContinuousMode();

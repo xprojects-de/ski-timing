@@ -19,6 +19,12 @@ void BatteryCheck::init() {
 
 uint16_t BatteryCheck::measureVoltage() {
 
+  // The battery voltage is divided by a resistor divider before reaching
+  // the ADC pin.  The factor 4.9 reconstructs the original battery voltage
+  // from the ADC reading in millivolts.
+  // (Typical divider: 100 kΩ / 390 kΩ → ratio ≈ 4.9)
+  static const float DIVIDER_FACTOR = 4.9f;
+
   digitalWrite(ctrlPin, HIGH);
   delay(10);
 
@@ -27,11 +33,11 @@ uint16_t BatteryCheck::measureVoltage() {
     mvSum += analogReadMilliVolts(adcPin);
     delay(1);
   }
-  float avgMv = mvSum / 10.0;
+  float avgMv = mvSum / 10.0f;
 
   digitalWrite(ctrlPin, LOW);
 
-  float voltage = avgMv * 4.9;
+  float voltage = avgMv * DIVIDER_FACTOR;
   return (uint16_t)voltage;
 }
 

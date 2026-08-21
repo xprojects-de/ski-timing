@@ -18,41 +18,59 @@
 #define LORA_FIX_LENGTH_PAYLOAD_ON false
 #define LORA_IQ_INVERSION_ON false
 
-
 #define RX_TIMEOUT_VALUE 1000
-#define BUFFER_SIZE 30
+#define BUFFER_SIZE 64
+#define TX_QUEUE_DEPTH 4
 
 #define LORA_PREFIX "ST-"
 #define PREFIX_LEN 3
 
-// #define LORA_SYNCWORD 0x19
-
 static RadioEvents_t RadioEvents;
 
 char _rxBuffer[BUFFER_SIZE];
-char _txBuffer[BUFFER_SIZE];
 int16_t _rxSize = 0;
 int16_t _lastRssi = 0;
 int8_t _lastSnr = 0;
+volatile bool _packetReceived = false;
+volatile bool _radioBusy = false;
+volatile bool _rxActive = false;
 
-bool _sendRequested = false;
-bool _packetReceived = false;
-bool _radioBusy = false;
+SemaphoreHandle_t Lora::_dataMutex = NULL;
+QueueHandle_t Lora::_txQueue = NULL;
+volatile uint64_t Lora::_rxTimestamp = 0;
 
 static void loraTaskWorker(void *parameter) {
   Lora *loraInstance = static_cast<Lora *>(parameter);
   for (;;) {
     loraInstance->proccess();
-    vTaskDelay(pdMS_TO_TICKS(1));
+    vTaskDelay(pdMS_TO_TICKS(5));
   }
 }
 
-Lora::Lora() {}
+Lora::Lora() {
+  if (_dataMutex == NULL) {
+    _dataMutex = xSemaphoreCreateMutex();
+  }
+  if (_txQueue == NULL) {
+    _txQueue = xQueueCreate(TX_QUEUE_DEPTH, BUFFER_SIZE);
+  }
+}
 
 Lora::~Lora() {
+
   if (_taskHandle != NULL) {
     vTaskDelete(_taskHandle);
     _taskHandle = NULL;
+  }
+
+  if (_dataMutex != NULL) {
+    vSemaphoreDelete(_dataMutex);
+    _dataMutex = NULL;
+  }
+
+  if (_txQueue != NULL) {
+    vQueueDelete(_txQueue);
+    _txQueue = NULL;
   }
 }
 
@@ -69,10 +87,7 @@ void Lora::init() {
   RadioEvents.RxError = Lora::OnRxError;
 
   Radio.Init(&RadioEvents);
-
   Radio.SetPublicNetwork(false);
-  // Radio.SetSyncWord(LORA_SYNCWORD);
-
   Radio.SetChannel(RF_FREQUENCY);
 
   Radio.SetTxConfig(MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
@@ -102,41 +117,46 @@ void Lora::startTask(UBaseType_t priority, BaseType_t coreID) {
 }
 
 void Lora::sendData(const char *data) {
+  if (_txQueue == NULL) return;
 
-  if (!_radioBusy) {
-    snprintf(_txBuffer, BUFFER_SIZE, "%s%s", LORA_PREFIX, data);
-    _sendRequested = true;
+  char txBuf[BUFFER_SIZE];
+  snprintf(txBuf, BUFFER_SIZE, "%s%s", LORA_PREFIX, data);
+
+  if (xQueueSend(_txQueue, txBuf, 0) != pdTRUE) {
+    Serial.println("[LORA] WARNING: TX queue full, message dropped!");
   }
 }
 
-bool Lora::available() {
-  return _packetReceived;
-}
+bool Lora::tryGetPacket(char *buffer, size_t bufferSize, int16_t &size, int16_t &rssi, int8_t &snr) {
+  if (_dataMutex == NULL) return false;
+  if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(10)) != pdTRUE) return false;
 
-void Lora::getPacket(char *buffer, int16_t &size, int16_t &rssi, int8_t &snr) {
-
+  bool got = false;
   if (_packetReceived) {
-
-    memcpy(buffer, _rxBuffer, _rxSize);
-    buffer[_rxSize] = '\0';
-    size = _rxSize;
+    size_t copyLen = (_rxSize < (int16_t)(bufferSize - 1)) ? _rxSize : (bufferSize - 1);
+    memcpy(buffer, _rxBuffer, copyLen);
+    buffer[copyLen] = '\0';
+    size = (int16_t)copyLen;
     rssi = _lastRssi;
     snr = _lastSnr;
     _packetReceived = false;
+    got = true;
   }
+
+  xSemaphoreGive(_dataMutex);
+  return got;
 }
 
 void Lora::proccess() {
 
   if (!_radioBusy) {
-
-    if (_sendRequested) {
-
+    char txBuf[BUFFER_SIZE];
+    if (_txQueue != NULL && xQueueReceive(_txQueue, txBuf, 0) == pdTRUE) {
       _radioBusy = true;
-      _sendRequested = false;
-      Radio.Send((uint8_t *)_txBuffer, strlen(_txBuffer));
-
-    } else {
+      _rxActive = false;
+      Radio.Send((uint8_t *)txBuf, strlen(txBuf));
+    } else if (!_rxActive) {
+      _rxActive = true;
       Radio.Rx(0);
     }
   }
@@ -148,34 +168,41 @@ void Lora::OnTxDone() {
 }
 
 void Lora::OnTxTimeout() {
-  //Radio.Sleep();
   _radioBusy = false;
 }
 
 void Lora::OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
 
+  _rxTimestamp = (uint64_t)esp_timer_get_time();
+
   if (size >= PREFIX_LEN && memcmp(payload, LORA_PREFIX, PREFIX_LEN) == 0) {
 
-    uint16_t actualDataSize = size - PREFIX_LEN;
-    _rxSize = (actualDataSize < BUFFER_SIZE) ? actualDataSize : (BUFFER_SIZE - 1);
+    if (_dataMutex != NULL && xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
 
-    memcpy(_rxBuffer, payload + PREFIX_LEN, _rxSize);
-    _rxBuffer[_rxSize] = '\0';
+      uint16_t actualDataSize = size - PREFIX_LEN;
+      _rxSize = (actualDataSize < BUFFER_SIZE) ? actualDataSize : (BUFFER_SIZE - 1);
 
-    _lastRssi = rssi;
-    _lastSnr = snr;
-    _packetReceived = true;
-  } else {
-    _packetReceived = false;
+      memcpy(_rxBuffer, payload + PREFIX_LEN, _rxSize);
+      _rxBuffer[_rxSize] = '\0';
+
+      _lastRssi = rssi;
+      _lastSnr = snr;
+      _packetReceived = true;
+
+      xSemaphoreGive(_dataMutex);
+    }
   }
 
+  _rxActive = false;
   _radioBusy = false;
 }
 
 void Lora::OnRxTimeout() {
+  _rxActive = false;
   _radioBusy = false;
 }
 
 void Lora::OnRxError() {
+  _rxActive = false;
   _radioBusy = false;
 }

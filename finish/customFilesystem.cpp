@@ -26,7 +26,7 @@ bool CFs::isInit() {
   return _initialized;
 }
 
-bool CFs::append(float time) {
+bool CFs::append(int64_t time) {
   if (!_initialized) return false;
 
   _lastId++;
@@ -37,7 +37,9 @@ bool CFs::append(float time) {
     return false;
   }
 
-  f.printf("%d,%.2f\n", _lastId, time);
+  // Store time in milliseconds as integer — no float conversion to avoid
+  // precision loss for sessions longer than ~4 hours.
+  f.printf("%d,%lld\n", _lastId, time);
   f.close();
   return true;
 }
@@ -61,18 +63,6 @@ int CFs::getLastId() {
   return lastId;
 }
 
-String CFs::readAll() {
-  if (!_initialized) return "FS not init";
-  if (!LittleFS.exists("/times.csv")) return "";
-
-  File f = LittleFS.open("/times.csv", FILE_READ);
-  if (!f) return "";
-
-  String content = f.readString();
-  f.close();
-
-  return content;
-}
 
 bool CFs::clear() {
   if (!_initialized) return false;
@@ -91,6 +81,7 @@ bool CFs::clear() {
 }
 
 bool CFs::readInChunks(std::function<bool(const char* buffer, size_t length)> chunkCallback) {
+
   if (!_initialized) return false;
   if (!LittleFS.exists("/times.csv")) return false;
 
@@ -125,5 +116,4 @@ bool CFs::readInChunks(std::function<bool(const char* buffer, size_t length)> ch
 
   f.close();
   return success;
-
 }
