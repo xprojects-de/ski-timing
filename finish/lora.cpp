@@ -37,7 +37,7 @@ static void loraTaskWorker(void *parameter) {
   Lora *loraInstance = static_cast<Lora *>(parameter);
   for (;;) {
     loraInstance->proccess();
-    vTaskDelay(pdMS_TO_TICKS(1));
+    vTaskDelay(pdMS_TO_TICKS(5));
   }
 }
 
