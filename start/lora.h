@@ -25,8 +25,7 @@ public:
 
   void sendData(const char* data);
 
-  bool available();
-  void getPacket(char* buffer, int16_t& size, int16_t& rssi, int8_t& snr);
+  bool tryGetPacket(char* buffer, size_t bufferSize, int16_t& size, int16_t& rssi, int8_t& snr);
 
   static uint64_t getRxTimestamp() {
     return _rxTimestamp;

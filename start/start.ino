@@ -197,8 +197,7 @@ void loop() {
     Serial.printf("[SYNC] sync sent: %s\n", syncMsg);
   }
 
-  if (lora.available()) {
-    lora.getPacket(rxMsg, rxLen, rxRssi, rxSnr);
+  if (lora.tryGetPacket(rxMsg, sizeof(rxMsg), rxLen, rxRssi, rxSnr)) {
 
     if (strncmp(rxMsg, "syncack:", 8) == 0) {
 

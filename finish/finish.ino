@@ -227,9 +227,7 @@ void loop() {
 
   handleButtonStateMachine(currentMillis);
 
-  if (lora.available()) {
-
-    lora.getPacket(msg, len, rssi, snr);
+  if (lora.tryGetPacket(msg, sizeof(msg), len, rssi, snr)) {
     uint64_t rxTs = lora.getRxTimestamp();
 
     Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);

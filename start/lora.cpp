@@ -31,8 +31,8 @@ char _rxBuffer[BUFFER_SIZE];
 int16_t _rxSize = 0;
 int16_t _lastRssi = 0;
 int8_t _lastSnr = 0;
-bool _packetReceived = false;
-bool _radioBusy = false;
+volatile bool _packetReceived = false;
+volatile bool _radioBusy = false;
 
 SemaphoreHandle_t Lora::_dataMutex = NULL;
 QueueHandle_t Lora::_txQueue = NULL;
@@ -126,27 +126,24 @@ void Lora::sendData(const char *data) {
   }
 }
 
-bool Lora::available() {
-  bool received = false;
-  if (_dataMutex != NULL && xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-    received = _packetReceived;
-    xSemaphoreGive(_dataMutex);
-  }
-  return received;
-}
+bool Lora::tryGetPacket(char *buffer, size_t bufferSize, int16_t &size, int16_t &rssi, int8_t &snr) {
+  if (_dataMutex == NULL) return false;
+  if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(10)) != pdTRUE) return false;
 
-void Lora::getPacket(char *buffer, int16_t &size, int16_t &rssi, int8_t &snr) {
-  if (_dataMutex != NULL && xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-    if (_packetReceived) {
-      memcpy(buffer, _rxBuffer, _rxSize);
-      buffer[_rxSize] = '\0';
-      size = _rxSize;
-      rssi = _lastRssi;
-      snr = _lastSnr;
-      _packetReceived = false;
-    }
-    xSemaphoreGive(_dataMutex);
+  bool got = false;
+  if (_packetReceived) {
+    size_t copyLen = (_rxSize < (int16_t)(bufferSize - 1)) ? _rxSize : (bufferSize - 1);
+    memcpy(buffer, _rxBuffer, copyLen);
+    buffer[copyLen] = '\0';
+    size = (int16_t)copyLen;
+    rssi = _lastRssi;
+    snr = _lastSnr;
+    _packetReceived = false;
+    got = true;
   }
+
+  xSemaphoreGive(_dataMutex);
+  return got;
 }
 
 void Lora::proccess() {
