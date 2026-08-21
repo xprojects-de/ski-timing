@@ -244,15 +244,31 @@ void loop() {
   if (lora.available()) {
 
     lora.getPacket(msg, len, rssi, snr);
+    uint64_t rxTs = lora.getRxTimestamp();
 
     Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
 
     if (strncmp(msg, "sync:", 5) == 0) {
-      timeSync.syncTime(atoll(&msg[5]), &stopWatch);
-    } else {
 
+      uint64_t t1 = strtoull(&msg[5], nullptr, 10);
+      if (timeSync.onSyncMsg(t1, rxTs, &stopWatch)) {
+
+        char ack[32];
+        snprintf(ack, sizeof(ack), "syncack:%llu", t1);
+        lora.sendData(ack);
+        Serial.printf("[TIMESYNC] syncack sent for t1=%llu\n", t1);
+      }
+
+    } else if (strncmp(msg, "syncfin:", 8) == 0) {
+
+      uint64_t t1 = 0;
+      int64_t  halfRtt = 0;
+      sscanf(&msg[8], "%llu:%lld", &t1, &halfRtt);
+      timeSync.onSyncFinMsg(t1, halfRtt, &stopWatch);
+
+    } else {
       if (timeSync.isInit()) {
-        stopWatch.triggerStart(atoll(msg));
+        stopWatch.triggerStart(strtoull(msg, nullptr, 10));
       }
     }
   }

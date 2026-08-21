@@ -32,6 +32,7 @@ bool _radioBusy = false;
 bool _rxActive = false;
 
 SemaphoreHandle_t Lora::_dataMutex = NULL;
+volatile uint64_t Lora::_rxTimestamp = 0;
 
 static void loraTaskWorker(void *parameter) {
   Lora *loraInstance = static_cast<Lora *>(parameter);
@@ -157,6 +158,8 @@ void Lora::OnTxTimeout() {
 }
 
 void Lora::OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
+
+  _rxTimestamp = (uint64_t)esp_timer_get_time();
 
   if (size >= PREFIX_LEN && memcmp(payload, LORA_PREFIX, PREFIX_LEN) == 0) {
 

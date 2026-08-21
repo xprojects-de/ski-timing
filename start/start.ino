@@ -2,6 +2,7 @@
 #include "display.h"
 #include "lora.h"
 #include "batteryCheck.h"
+#include <esp_timer.h>
 
 #define BUTTON_PIN 0
 #define SYNC_INTERVAL_MS 5000
@@ -27,6 +28,10 @@ char timeTriggerStr[32] = "-";
 char syncMsg[32];
 char uptimeStr[32];
 char batteryStr[8];
+char rxMsg[64];
+int16_t rxLen;
+int16_t rxRssi;
+int8_t  rxSnr;
 
 unsigned long lastSyncTime = -SYNC_INTERVAL_MS;
 unsigned long lastDisplayUpdate = 0;
@@ -203,7 +208,23 @@ void loop() {
 
     snprintf(syncMsg, sizeof(syncMsg), "sync:%llu", (uint64_t)esp_timer_get_time());
     lora.sendData(syncMsg);
-    Serial.printf("send sync: %s\n", syncMsg);
+    Serial.printf("[SYNC] sync sent: %s\n", syncMsg);
+  }
+
+  if (lora.available()) {
+    lora.getPacket(rxMsg, rxLen, rxRssi, rxSnr);
+
+    if (strncmp(rxMsg, "syncack:", 8) == 0) {
+
+      uint64_t t1      = strtoull(&rxMsg[8], nullptr, 10);
+      uint64_t t4      = (uint64_t)esp_timer_get_time();
+      int64_t halfRtt  = (int64_t)((t4 - t1) / 2);
+
+      char finMsg[64];
+      snprintf(finMsg, sizeof(finMsg), "syncfin:%llu:%lld", t1, halfRtt);
+      lora.sendData(finMsg);
+      Serial.printf("[SYNC] syncfin sent: t1=%llu  half_rtt=%lld us\n", t1, halfRtt);
+    }
   }
 
   vTaskDelay(1);
