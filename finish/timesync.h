@@ -18,16 +18,16 @@ private:
   // A "pending" entry is created when we receive a sync packet and
   // completed when the matching syncfin arrives from the start device.
   struct SyncPending {
-    uint64_t t1;    // start-device timer at send time (from sync msg)
-    uint64_t t2;    // finish-device timer at receive time (captured in OnRxDone)
+    uint64_t t1;  // start-device timer at send time (from sync msg)
+    uint64_t t2;  // finish-device timer at receive time (captured in OnRxDone)
     bool valid;
   } _pending;
 
-  int64_t  _offsetSamples[TIMESYNC_SAMPLES];
-  int      _samplesCollected = 0;
-  int64_t  _finalMedianOffset = 0;
-  bool     _isTimeSynced = false;
-  uint64_t _lastT1 = 0;   // For start-device reset detection
+  int64_t _offsetSamples[TIMESYNC_SAMPLES];
+  int _samplesCollected = 0;
+  int64_t _finalMedianOffset = 0;
+  bool _isTimeSynced = false;
+  uint64_t _lastT1 = 0;  // For start-device reset detection
 
   // Returns the median of _offsetSamples[0.._samplesCollected-1].
   // Works correctly for both odd and even counts.

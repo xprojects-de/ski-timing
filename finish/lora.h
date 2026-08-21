@@ -28,7 +28,9 @@ public:
 
   // Returns the esp_timer timestamp captured at the start of OnRxDone.
   // Use this for precise receive-time measurements (RTT-sync).
-  static uint64_t getRxTimestamp() { return _rxTimestamp; }
+  static uint64_t getRxTimestamp() {
+    return _rxTimestamp;
+  }
 
   static void OnTxDone();
   static void OnTxTimeout();

@@ -3,7 +3,7 @@
 #include <math.h>
 
 Timesync::Timesync() {
-  _pending = {0, 0, false};
+  _pending = { 0, 0, false };
   _samplesCollected = 0;
   _finalMedianOffset = 0;
   _isTimeSynced = false;
@@ -53,7 +53,7 @@ bool Timesync::onSyncMsg(uint64_t t1, uint64_t rxTimestamp, StopWatch* sw) {
   // Detect start-device reboot / counter wrap (t1 jumped backwards)
   if (_lastT1 > 0 && t1 < _lastT1) {
     Serial.println("[TIMESYNC] Start-device reset detected — re-syncing...");
-    _pending = {0, 0, false};
+    _pending = { 0, 0, false };
     _samplesCollected = 0;
     _isTimeSynced = false;
     // Reset stopwatch offset so no stale value is used during re-sync
@@ -76,7 +76,7 @@ bool Timesync::onSyncMsg(uint64_t t1, uint64_t rxTimestamp, StopWatch* sw) {
   }
 
   // Store t1 and t2 (finish-side receive time) for this round-trip
-  _pending = {t1, rxTimestamp, true};
+  _pending = { t1, rxTimestamp, true };
 
   Serial.printf("[TIMESYNC] sync received  t1=%llu  t2=%llu  (sample %d/%d)\n",
                 t1, rxTimestamp, _samplesCollected + 1, TIMESYNC_SAMPLES);

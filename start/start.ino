@@ -30,7 +30,7 @@ char batteryStr[8];
 char rxMsg[64];
 int16_t rxLen;
 int16_t rxRssi;
-int8_t  rxSnr;
+int8_t rxSnr;
 
 unsigned long lastSyncTime = -SYNC_INTERVAL_MS;
 unsigned long lastDisplayUpdate = 0;
@@ -202,9 +202,9 @@ void loop() {
 
     if (strncmp(rxMsg, "syncack:", 8) == 0) {
 
-      uint64_t t1      = strtoull(&rxMsg[8], nullptr, 10);
-      uint64_t t4      = (uint64_t)esp_timer_get_time();
-      int64_t halfRtt  = (int64_t)((t4 - t1) / 2);
+      uint64_t t1 = strtoull(&rxMsg[8], nullptr, 10);
+      uint64_t t4 = (uint64_t)esp_timer_get_time();
+      int64_t halfRtt = (int64_t)((t4 - t1) / 2);
 
       char finMsg[64];
       snprintf(finMsg, sizeof(finMsg), "syncfin:%llu:%lld", t1, halfRtt);

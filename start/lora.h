@@ -27,7 +27,9 @@ public:
   void getPacket(char* buffer, int16_t& size, int16_t& rssi, int8_t& snr);
 
   // Returns the esp_timer timestamp captured at the start of OnRxDone.
-  static uint64_t getRxTimestamp() { return _rxTimestamp; }
+  static uint64_t getRxTimestamp() {
+    return _rxTimestamp;
+  }
 
   static void OnTxDone();
   static void OnTxTimeout();
