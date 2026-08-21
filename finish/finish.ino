@@ -248,7 +248,7 @@ void loop() {
     } else if (strncmp(msg, "syncfin:", 8) == 0) {
 
       uint64_t t1 = 0;
-      int64_t  halfRtt = 0;
+      int64_t halfRtt = 0;
       sscanf(&msg[8], "%llu:%lld", &t1, &halfRtt);
       timeSync.onSyncFinMsg(t1, halfRtt, &stopWatch);
 
