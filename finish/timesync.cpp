@@ -99,4 +99,3 @@ void Timesync::syncTime(uint64_t remoteTime, StopWatch* stopWatch) {
 bool Timesync::isInit() {
   return _isTimeSynced;
 }
-

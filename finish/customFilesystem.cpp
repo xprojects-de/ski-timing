@@ -114,5 +114,4 @@ bool CFs::readInChunks(std::function<bool(const char* buffer, size_t length)> ch
 
   f.close();
   return success;
-
 }

@@ -6,7 +6,7 @@ GpsTime::GpsTime(uint8_t rxPin, uint8_t txPin, uint8_t pwr_pin)
 
 void GpsTime::init() {
   pinMode(pwrPin, OUTPUT);
-  digitalWrite(pwrPin, LOW);   // Power ON (active low)
+  digitalWrite(pwrPin, LOW);  // Power ON (active low)
   delay(100);
 
   gpsSerial.begin(9600, SERIAL_8N1, 38, 39);  // RX, TX

@@ -31,11 +31,10 @@ void CustomWebserver::data_handler(AsyncWebServerRequest *request) {
   response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 
   bool success = fs_instance->readInChunks(
-    [response](const char* data, size_t length) -> bool {
-      response->write((const uint8_t*)data, length);
+    [response](const char *data, size_t length) -> bool {
+      response->write((const uint8_t *)data, length);
       return true;
-    }
-  );
+    });
 
   if (!success) {
     response->print("Error reading data");
