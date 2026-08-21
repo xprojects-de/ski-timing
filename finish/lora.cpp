@@ -31,6 +31,8 @@ bool _packetReceived = false;
 bool _radioBusy = false;
 bool _rxActive = false;
 
+SemaphoreHandle_t Lora::_dataMutex = NULL;
+
 static void loraTaskWorker(void *parameter) {
   Lora *loraInstance = static_cast<Lora *>(parameter);
   for (;;) {
@@ -39,12 +41,22 @@ static void loraTaskWorker(void *parameter) {
   }
 }
 
-Lora::Lora() {}
+Lora::Lora() {
+  if (_dataMutex == NULL) {
+    _dataMutex = xSemaphoreCreateMutex();
+  }
+}
 
 Lora::~Lora() {
+
   if (_taskHandle != NULL) {
     vTaskDelete(_taskHandle);
     _taskHandle = NULL;
+  }
+
+  if (_dataMutex != NULL) {
+    vSemaphoreDelete(_dataMutex);
+    _dataMutex = NULL;
   }
 }
 
@@ -148,15 +160,20 @@ void Lora::OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
 
   if (size >= PREFIX_LEN && memcmp(payload, LORA_PREFIX, PREFIX_LEN) == 0) {
 
-    uint16_t actualDataSize = size - PREFIX_LEN;
-    _rxSize = (actualDataSize < BUFFER_SIZE) ? actualDataSize : (BUFFER_SIZE - 1);
+    if (_dataMutex != NULL && xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
 
-    memcpy(_rxBuffer, payload + PREFIX_LEN, _rxSize);
-    _rxBuffer[_rxSize] = '\0';
+      uint16_t actualDataSize = size - PREFIX_LEN;
+      _rxSize = (actualDataSize < BUFFER_SIZE) ? actualDataSize : (BUFFER_SIZE - 1);
 
-    _lastRssi = rssi;
-    _lastSnr = snr;
-    _packetReceived = true;
+      memcpy(_rxBuffer, payload + PREFIX_LEN, _rxSize);
+      _rxBuffer[_rxSize] = '\0';
+
+      _lastRssi = rssi;
+      _lastSnr = snr;
+      _packetReceived = true;
+
+      xSemaphoreGive(_dataMutex);
+    }
   } else {
     _packetReceived = false;
   }

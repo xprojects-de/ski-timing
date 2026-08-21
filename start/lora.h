@@ -2,11 +2,13 @@
 #define LORA_H
 
 #include "LoRaWan_APP.h"
+#include <freertos/semphr.h>
 
 class Lora {
 
 private:
   TaskHandle_t _taskHandle = NULL;
+  static SemaphoreHandle_t _dataMutex;
 
 public:
   Lora();
