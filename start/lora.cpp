@@ -33,8 +33,6 @@ static RadioEvents_t RadioEvents;
 volatile bool _radioBusy = false;
 volatile bool _rxActive = false;
 
-
-SemaphoreHandle_t Lora::_dataMutex = NULL;
 QueueHandle_t Lora::_txQueue = NULL;
 QueueHandle_t Lora::_rxQueue = NULL;
 volatile uint64_t Lora::_rxTimestamp = 0;
@@ -48,9 +46,7 @@ static void loraTaskWorker(void *parameter) {
 }
 
 Lora::Lora() {
-  if (_dataMutex == NULL) {
-    _dataMutex = xSemaphoreCreateMutex();
-  }
+
   if (_txQueue == NULL) {
     _txQueue = xQueueCreate(TX_QUEUE_DEPTH, BUFFER_SIZE);
   }
@@ -66,10 +62,6 @@ Lora::~Lora() {
     _taskHandle = NULL;
   }
 
-  if (_dataMutex != NULL) {
-    vSemaphoreDelete(_dataMutex);
-    _dataMutex = NULL;
-  }
 
   if (_txQueue != NULL) {
     vQueueDelete(_txQueue);
