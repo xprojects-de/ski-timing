@@ -16,16 +16,65 @@ const char index_html[] PROGMEM = R"rawliteral(
         .btn-danger { background-color: #f44336; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .btn-danger:hover { background-color: #da190b; }
         .btn-danger:disabled { background-color: #aaa; cursor: not-allowed; }
+        .btn-secondary { background-color: #555; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .btn-secondary:hover { background-color: #333; }
+        .btn-secondary:disabled { background-color: #aaa; cursor: not-allowed; }
+        .btn-mode-normal  { background-color: #2196F3; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .btn-mode-normal:hover  { background-color: #1565C0; }
+        .btn-mode-continuous { background-color: #FF9800; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .btn-mode-continuous:hover { background-color: #E65100; }
+        .btn-mode-normal:disabled, .btn-mode-continuous:disabled { background-color: #aaa; cursor: not-allowed; }
     </style>
 </head>
 <body>
     <h1>Ski Timing</h1>
-    <button class="btn btn-danger" id="discardBtn" onclick="discardStarter()">Sturz: Läufer aus Queue entfernen</button>
+    <button class="btn btn-danger" id="discardBtn" onclick="discardStarter()">⚠️ Sturz: Läufer aus Queue entfernen</button>
+    <button class="btn btn-mode-normal" id="modeBtn" onclick="toggleMode()">🔄 Modus: Normal → Continuous</button>
+    <button class="btn btn-secondary" id="resetBtn" onclick="resetAll()">🗑️ Alle Zeiten löschen (Reset)</button>
     <table class="tabelle" id="results">
         </table>
 
     <script>
-        let isUpdating = false;  // Flag um mehrfache gleichzeitige Requests zu verhindern
+        let isUpdating = false;
+        let isContinuous = false;  // Spiegelt den aktuellen Modus des Geräts
+
+        function applyModeButton(continuous) {
+          isContinuous = continuous;
+          const btn = document.getElementById('modeBtn');
+          if (continuous) {
+            btn.className = 'btn btn-mode-continuous';
+            btn.textContent = '🔄 Modus: Continuous → Normal';
+          } else {
+            btn.className = 'btn btn-mode-normal';
+            btn.textContent = '🔄 Modus: Normal → Continuous';
+          }
+        }
+
+        function fetchStatus() {
+          fetch('/status')
+            .then(r => r.text())
+            .then(mode => applyModeButton(mode.trim() === 'continuous'))
+            .catch(err => console.error("Status-Fehler:", err));
+        }
+
+        function toggleMode() {
+          const btn = document.getElementById('modeBtn');
+          btn.disabled = true;
+          const endpoint = isContinuous ? '/disableContinuousMode' : '/enableContinuousMode';
+          fetch(endpoint)
+            .then(response => {
+              if (response.ok) {
+                applyModeButton(!isContinuous);
+              } else {
+                alert("Fehler beim Moduswechsel!");
+              }
+            })
+            .catch(err => {
+              console.error("Netzwerkfehler:", err);
+              alert("Verbindung zum Zeitmessgerät verloren!");
+            })
+            .finally(() => { btn.disabled = false; });
+        }
 
         function updateTable() {
           // Verhindere mehrfache parallele Requests
@@ -92,9 +141,9 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         setInterval(updateTable, 3000);
         updateTable();
+        fetchStatus();
 
-        function discardStarter() {
-          if (!confirm("Älteste Startzeit verwerfen?\n(z.B. wegen Sturz oder Fehlstart)\n\nDiese Aktion kann nicht rückgängig gemacht werden!")) return;
+        function discardStarter() {          if (!confirm("Älteste Startzeit verwerfen?\n(z.B. wegen Sturz oder Fehlstart)\n\nDiese Aktion kann nicht rückgängig gemacht werden!")) return;
           const btn = document.getElementById('discardBtn');
           btn.disabled = true;
           fetch('/discard')
@@ -103,6 +152,27 @@ const char index_html[] PROGMEM = R"rawliteral(
                 updateTable();
               } else {
                 response.text().then(msg => alert("Fehler: " + msg));
+              }
+            })
+            .catch(err => {
+              console.error("Netzwerkfehler:", err);
+              alert("Verbindung zum Zeitmessgerät verloren!");
+            })
+            .finally(() => {
+              btn.disabled = false;
+            });
+        }
+
+        function resetAll() {
+          if (!confirm("Wirklich ALLE gespeicherten Zeiten und die Queue löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden!")) return;
+          const btn = document.getElementById('resetBtn');
+          btn.disabled = true;
+          fetch('/reset')
+            .then(response => {
+              if (response.ok) {
+                updateTable();
+              } else {
+                alert("Fehler beim Reset!");
               }
             })
             .catch(err => {

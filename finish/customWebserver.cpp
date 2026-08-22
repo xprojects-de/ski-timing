@@ -55,6 +55,17 @@ void CustomWebserver::reset_handler(AsyncWebServerRequest *request) {
   }
 }
 
+void CustomWebserver::status_handler(AsyncWebServerRequest *request) {
+  if (sw_instance == nullptr) {
+    request->send(500, "text/plain", "No SW instance");
+    return;
+  }
+  const char* mode = sw_instance->isContinuousMode() ? "continuous" : "normal";
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", mode);
+  response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  request->send(response);
+}
+
 void CustomWebserver::discard_handler(AsyncWebServerRequest *request) {
 
   if (sw_instance == nullptr) {
@@ -119,6 +130,10 @@ void CustomWebserver::init(CFs *fs_inst, StopWatch *sw_inst) {
 
   server->on("/reset", HTTP_GET, [this](AsyncWebServerRequest *request) {
     this->reset_handler(request);
+  });
+
+  server->on("/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    this->status_handler(request);
   });
 
   server->on("/discard", HTTP_GET, [this](AsyncWebServerRequest *request) {
