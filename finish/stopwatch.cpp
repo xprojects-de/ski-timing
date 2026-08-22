@@ -1,6 +1,6 @@
 #include "stopwatch.h"
 
-#define START_TIME_QUEUE_DEPTH 20
+#define START_TIME_QUEUE_DEPTH 3
 
 StopWatch::StopWatch() {
   _startTime = 0;
@@ -40,7 +40,7 @@ void StopWatch::triggerStart(uint64_t time) {
 
     int64_t startTime = (int64_t)time;
     if (xQueueSend(_startTimeQueue, &startTime, 0) != pdTRUE) {
-      Serial.println("[STOPWATCH] WARNING: Start time queue full, start ignored!");
+      Serial.println("[STOPWATCH] WARNING: Maximum 3 parallel events! Start ignoriert.");
     } else {
       Serial.printf("[STOPWATCH] Added start time to queue. Queue size: %d\n", uxQueueMessagesWaiting(_startTimeQueue));
     }
