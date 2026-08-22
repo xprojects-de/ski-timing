@@ -6,12 +6,21 @@
 #include <freertos/queue.h>
 #include <esp_timer.h>
 
+struct LoraRxPacket {
+  char data[64];
+  int16_t size;
+  int16_t rssi;
+  int8_t snr;
+  uint64_t rxTimestamp;
+};
+
 class Lora {
 
 private:
   TaskHandle_t _taskHandle = NULL;
   static SemaphoreHandle_t _dataMutex;
   static QueueHandle_t _txQueue;          // Thread-safe TX queue
+  static QueueHandle_t _rxQueue;          // Thread-safe RX queue
   static volatile uint64_t _rxTimestamp;  // µs timestamp of last received packet (OnRxDone)
 
 public:
