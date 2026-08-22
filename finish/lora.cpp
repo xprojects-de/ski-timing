@@ -36,7 +36,7 @@ volatile uint64_t Lora::_rxTimestamp = 0;
 static void loraTaskWorker(void *parameter) {
   Lora *loraInstance = static_cast<Lora *>(parameter);
   for (;;) {
-    loraInstance->proccess();
+    loraInstance->process();
     vTaskDelay(pdMS_TO_TICKS(5));
   }
 }
@@ -123,7 +123,7 @@ void Lora::sendData(const char *data) {
   }
 }
 
-bool Lora::tryGetPacket(char *buffer, size_t bufferSize, int16_t &size, int16_t &rssi, int8_t &snr) {
+bool Lora::tryGetPacket(char *buffer, size_t bufferSize, int16_t &size, int16_t &rssi, int8_t &snr, uint64_t &rxTimestamp) {
   if (_rxQueue == NULL) return false;
 
   LoraRxPacket packet;
@@ -134,13 +134,14 @@ bool Lora::tryGetPacket(char *buffer, size_t bufferSize, int16_t &size, int16_t 
     size = (int16_t)copyLen;
     rssi = packet.rssi;
     snr = packet.snr;
+    rxTimestamp = packet.rxTimestamp;
     return true;
   }
 
   return false;
 }
 
-void Lora::proccess() {
+void Lora::process() {
 
   if (!_radioBusy) {
     char txBuf[BUFFER_SIZE];

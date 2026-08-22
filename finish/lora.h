@@ -28,14 +28,12 @@ public:
   void preInit();
   void init();
   void startTask(UBaseType_t priority = 2, BaseType_t coreID = 1);
-  void proccess();
+  void process();
 
   void sendData(const char* data);
 
-  bool tryGetPacket(char* buffer, size_t bufferSize, int16_t& size, int16_t& rssi, int8_t& snr);
+  bool tryGetPacket(char* buffer, size_t bufferSize, int16_t& size, int16_t& rssi, int8_t& snr, uint64_t& rxTimestamp);
 
-  // Returns the esp_timer timestamp captured at the start of OnRxDone.
-  // Use this for precise receive-time measurements (RTT-sync).
   static uint64_t getRxTimestamp() {
     return _rxTimestamp;
   }

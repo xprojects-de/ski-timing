@@ -40,6 +40,7 @@ unsigned long buttonReleaseTime = 0;
 char msg[64];
 int16_t len, rssi;
 int8_t snr;
+uint64_t rxTs = 0;
 
 char batteryStr[8];
 char uptimeStr[32];
@@ -241,8 +242,7 @@ void loop() {
 
   handleButtonStateMachine(currentMillis);
 
-  if (lora.tryGetPacket(msg, sizeof(msg), len, rssi, snr)) {
-    uint64_t rxTs = lora.getRxTimestamp();
+  if (lora.tryGetPacket(msg, sizeof(msg), len, rssi, snr, rxTs)) {
 
     Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
 

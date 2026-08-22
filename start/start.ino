@@ -33,10 +33,8 @@ char rxMsg[64];
 int16_t rxLen;
 int16_t rxRssi;
 int8_t rxSnr;
-
-
-// Initialized to trigger the first sync immediately on startup.
-// (unsigned underflow is well-defined in C/C++)
+uint64_t rxTs = 0;
+int syncSamplesCompleted = 0;
 unsigned long lastSyncTime = (unsigned long)(0UL - SYNC_INTERVAL_MS);
 unsigned long lastDisplayUpdate = 0;
 
@@ -202,7 +200,13 @@ void loop() {
 
     dp.setTextAlignment(TEXT_ALIGN_LEFT);
     dp.setFont(ArialMT_Plain_16);
-    dp.drawString(0, 0, "START");
+    if (syncSamplesCompleted == 0) {
+      dp.drawString(0, 0, "START");
+    } else {
+      char hdr[20];
+      snprintf(hdr, sizeof(hdr), "START S:%d", syncSamplesCompleted);
+      dp.drawString(0, 0, hdr);
+    }
 
     dp.setTextAlignment(TEXT_ALIGN_RIGHT);
     dp.setFont(ArialMT_Plain_10);
@@ -231,18 +235,19 @@ void loop() {
     }
   }
 
-  if (lora.tryGetPacket(rxMsg, sizeof(rxMsg), rxLen, rxRssi, rxSnr)) {
+  if (lora.tryGetPacket(rxMsg, sizeof(rxMsg), rxLen, rxRssi, rxSnr, rxTs)) {
 
     if (strncmp(rxMsg, "syncack:", 8) == 0) {
 
       uint64_t t1 = strtoull(&rxMsg[8], nullptr, 10);
-      uint64_t t4 = (uint64_t)esp_timer_get_time();
+      uint64_t t4 = rxTs;
       int64_t halfRtt = (int64_t)((t4 - t1) / 2);
 
       char finMsg[64];
       snprintf(finMsg, sizeof(finMsg), "syncfin:%llu:%lld", t1, halfRtt);
       lora.sendData(finMsg);
-      Serial.printf("[SYNC] syncfin sent: t1=%llu  half_rtt=%lld us\n", t1, halfRtt);
+      syncSamplesCompleted++;
+      Serial.printf("[SYNC] syncfin sent: t1=%llu  t4=%llu  half_rtt=%lld us  (%d samples)\n", t1, t4, halfRtt, syncSamplesCompleted);
     }
   }
 
