@@ -40,6 +40,10 @@ int8_t rxSnr;
 unsigned long lastSyncTime = (unsigned long)(0UL - SYNC_INTERVAL_MS);
 unsigned long lastDisplayUpdate = 0;
 
+#define BURST_COOLDOWN_MS 2000
+unsigned long lastBurstTime = 0;
+bool burstCooldownActive = false;
+
 void VextON(void) {
   pinMode(Vext, OUTPUT);
   digitalWrite(Vext, LOW);
@@ -81,7 +85,7 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
         unsigned long duration = currentMillis - buttonPressStartTime;
 
-        if (duration >= 30) {
+        if (duration >= 30 && !burstCooldownActive) {
           // Read 64-bit volatile in a critical section to avoid torn reads
           noInterrupts();
           uint64_t capturedMicros = buttonPressMicros;
@@ -93,6 +97,9 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
           lora.sendData(startMsg, true);
           Serial.printf("[BTN] Start-Trigger (Burst): %s\n", startMsg);
+
+          lastBurstTime = currentMillis;
+          burstCooldownActive = true;
         }
 
         buttonState = BTN_IDLE;
@@ -178,6 +185,11 @@ void loop() {
 
   battery.update(currentMillis);
 
+  if (burstCooldownActive && (currentMillis - lastBurstTime >= BURST_COOLDOWN_MS)) {
+    burstCooldownActive = false;
+    Serial.println("[BTN] Burst cooldown ready, Ready for new event.");
+  }
+
   handleButtonStateMachine(currentMillis);
 
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
@@ -210,9 +222,13 @@ void loop() {
   if (currentMillis - lastSyncTime >= SYNC_INTERVAL_MS) {
     lastSyncTime = currentMillis;
 
-    snprintf(syncMsg, sizeof(syncMsg), "sync:%llu", (uint64_t)esp_timer_get_time());
-    lora.sendData(syncMsg);
-    Serial.printf("[SYNC] sync sent: %s\n", syncMsg);
+    if (!burstCooldownActive) {
+      snprintf(syncMsg, sizeof(syncMsg), "sync:%llu", (uint64_t)esp_timer_get_time());
+      lora.sendData(syncMsg);
+      Serial.printf("[SYNC] sync sent: %s\n", syncMsg);
+    } else {
+      Serial.println("[SYNC] sync skipped (burst cooldown active)");
+    }
   }
 
   if (lora.tryGetPacket(rxMsg, sizeof(rxMsg), rxLen, rxRssi, rxSnr)) {

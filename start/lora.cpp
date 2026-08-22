@@ -20,7 +20,7 @@
 
 #define RX_TIMEOUT_VALUE 1000
 #define BUFFER_SIZE 64
-#define TX_QUEUE_DEPTH 4
+#define TX_QUEUE_DEPTH 8
 #define RX_QUEUE_DEPTH 10
 
 #define LORA_PREFIX "ST-"
