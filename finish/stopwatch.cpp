@@ -1,11 +1,14 @@
 #include "stopwatch.h"
 
 #define START_TIME_QUEUE_DEPTH 3
+#define DEBOUNCE_TIME_NORMAL_US 500000
+#define DEBOUNCE_TIME_CONTINUOUS_US 50000
 
 StopWatch::StopWatch() {
   _lastTime = 0;
   _offset = 0;
   _isContinuousMode = false;
+  _lastFinishTimestamp = 0;
   _startTimeQueue = xQueueCreate(START_TIME_QUEUE_DEPTH, sizeof(int64_t));
 }
 
@@ -53,6 +56,15 @@ void StopWatch::triggerFinish(CFs* fs_instance) {
 }
 
 void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp) {
+
+  const uint64_t debounceTime = _isContinuousMode ? DEBOUNCE_TIME_CONTINUOUS_US : DEBOUNCE_TIME_NORMAL_US;
+
+  if (_lastFinishTimestamp != 0 && (timestamp - _lastFinishTimestamp) < debounceTime) {
+    Serial.printf("[STOPWATCH] Finish ignored: debounce active (%llu us since last trigger, mode: %s)\n", timestamp - _lastFinishTimestamp, _isContinuousMode ? "continuous" : "normal");
+    return;
+  }
+
+  _lastFinishTimestamp = timestamp;
 
   // Convert the finish-local timestamp into the start device's time domain
   // by applying the sync offset (same transformation as getSyncedMicros()).
@@ -136,6 +148,7 @@ bool StopWatch::isContinuousMode() {
 
 bool StopWatch::reset() {
   _lastTime = 0;
+  _lastFinishTimestamp = 0;
 
   if (_startTimeQueue != NULL) {
     xQueueReset(_startTimeQueue);
