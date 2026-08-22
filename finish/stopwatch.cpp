@@ -29,15 +29,27 @@ void StopWatch::triggerStart(uint64_t time) {
   if (_startTimeQueue == NULL) return;
 
   int64_t startTime = (int64_t)time;
+
+  if (_isContinuousMode) {
+
+    if (uxQueueMessagesWaiting(_startTimeQueue) == 0) {
+      xQueueSend(_startTimeQueue, &startTime, 0);
+      Serial.println("[STOPWATCH] Continuous mode: set startTime");
+    } else {
+      Serial.println("[STOPWATCH] Continuous mode:startTime still triggered");
+    }
+    return;
+  }
+
   if (xQueueSend(_startTimeQueue, &startTime, 0) != pdTRUE) {
     Serial.println("[STOPWATCH] WARNING: Maximum 3 parallel events! Start ignoriert.");
   } else {
-    Serial.printf("[STOPWATCH] Added start time to queue. Queue size: %d\n", uxQueueMessagesWaiting(_startTimeQueue));
+    Serial.printf("[STOPWATCH] Start time added to queue. Queue size: %d\n", uxQueueMessagesWaiting(_startTimeQueue));
   }
 }
 
 void StopWatch::triggerFinish(CFs* fs_instance) {
-  triggerFinishWithTimestamp(fs_instance, (uint64_t)getSyncedMicros());
+  triggerFinishWithTimestamp(fs_instance, (uint64_t)esp_timer_get_time());
 }
 
 void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp) {
@@ -57,11 +69,11 @@ void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp)
     if (xQueuePeek(_startTimeQueue, &startTime, 0) != pdTRUE) {
 
       if (xQueueSend(_startTimeQueue, &syncedTimestamp, 0) == pdTRUE) {
-        Serial.println("[STOPWATCH] Continuous mode: Start time set (queue was empty)");
+        Serial.println("[STOPWATCH] Continuous mode: start time set");
       }
-
       return;
     }
+
   } else {
 
     if (xQueueReceive(_startTimeQueue, &startTime, 0) != pdTRUE) {
