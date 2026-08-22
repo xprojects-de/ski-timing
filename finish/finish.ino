@@ -8,6 +8,7 @@
 #include "timesync.h"
 #include "batteryCheck.h"
 #include <WiFi.h>
+#include <esp_timer.h>
 
 #define BUTTON_PIN 0
 #define SYNC_LED_PIN 35
@@ -22,16 +23,34 @@ Timesync timeSync;
 BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
+volatile uint64_t buttonPressMicros = 0;
 unsigned long lastDisplayUpdate = 0;
-const unsigned long DISPLAY_UPDATE_INTERVAL = 200;
-unsigned long lastButtonPress = 0;
+const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
+
+enum ButtonState {
+  BTN_IDLE,
+  BTN_PRESSED,
+  BTN_WAITING_RELEASE,
+  BTN_DEBOUNCE_RELEASE
+};
+ButtonState buttonState = BTN_IDLE;
+unsigned long buttonPressStartTime = 0;
+unsigned long buttonReleaseTime = 0;
 
 char msg[64];
 int16_t len, rssi;
 int8_t snr;
+uint64_t rxTs = 0;
+
+char batteryStr[8];
+char uptimeStr[32];
+char timeStr[32];
 
 void IRAM_ATTR handleButtonPress() {
-  buttonTriggered = true;
+  if (!buttonTriggered) {
+    buttonPressMicros = esp_timer_get_time();
+    buttonTriggered = true;
+  }
 }
 
 void VextON(void) {
@@ -49,6 +68,80 @@ void showChipId() {
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
   Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+}
+
+void handleButtonStateMachine(unsigned long currentMillis) {
+
+  switch (buttonState) {
+
+    case BTN_IDLE:
+
+      if (buttonTriggered) {
+        buttonTriggered = false;
+        buttonState = BTN_PRESSED;
+        buttonPressStartTime = currentMillis;
+      }
+
+      break;
+
+    case BTN_PRESSED:
+
+      if (digitalRead(BUTTON_PIN) == HIGH) {
+
+        unsigned long duration = currentMillis - buttonPressStartTime;
+
+        if (duration >= 2500) {
+
+          stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
+          stopWatch.reset();
+          Serial.printf("[BTN] Mode changed to: %s\n", stopWatch.isContinuousMode() ? "Continuous" : "Normal");
+        } else if (duration >= 1000) {
+
+          if (!stopWatch.isContinuousMode()) {
+            if (stopWatch.discardOldestStart()) {
+              Serial.println("[BTN] Fall detected: Start time removed.");
+            } else {
+              Serial.println("[BTN] Fall detected: no startTime in queue!");
+            }
+          } else {
+            Serial.println("[BTN] Fall detected: not possible in continuousMode.");
+          }
+        } else if (duration >= 30) {
+          // Read 64-bit volatile in a critical section to avoid torn reads
+          noInterrupts();
+          uint64_t capturedMicros = buttonPressMicros;
+          interrupts();
+          stopWatch.triggerFinishWithTimestamp(&fs_instance, capturedMicros);
+          Serial.println("[BTN] Finish triggered");
+        }
+
+        buttonState = BTN_IDLE;
+
+      } else if (currentMillis - buttonPressStartTime >= 5000) {
+        buttonState = BTN_WAITING_RELEASE;
+      }
+
+      break;
+
+    case BTN_WAITING_RELEASE:
+      if (digitalRead(BUTTON_PIN) == HIGH) {
+        buttonReleaseTime = currentMillis;
+        buttonState = BTN_DEBOUNCE_RELEASE;
+      }
+      break;
+
+    case BTN_DEBOUNCE_RELEASE:
+      // Wait 50 ms without blocking, then confirm stable release
+      if (currentMillis - buttonReleaseTime >= 50) {
+        if (digitalRead(BUTTON_PIN) == HIGH) {
+          powerDownAndSleep();
+        } else {
+          buttonState = BTN_WAITING_RELEASE;
+        }
+      }
+
+      break;
+  }
 }
 
 void powerDownAndSleep() {
@@ -118,6 +211,15 @@ void loop() {
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
     lastDisplayUpdate = currentMillis;
 
+    snprintf(batteryStr, sizeof(batteryStr), "%d%%", battery.getPercentage());
+    snprintf(timeStr, sizeof(timeStr), "%s", stopWatch.draw().c_str());
+
+    if (timeSync.isInit()) {
+      snprintf(uptimeStr, sizeof(uptimeStr), "sync - Up: %lus", currentMillis / 1000);
+    } else {
+      snprintf(uptimeStr, sizeof(uptimeStr), "Up: %lus", currentMillis / 1000);
+    }
+
     dp.clear();
 
     dp.setTextAlignment(TEXT_ALIGN_LEFT);
@@ -126,81 +228,58 @@ void loop() {
     if (stopWatch.isContinuousMode()) {
       dp.drawString(0, 0, "FINISH (C)");
     } else {
-      dp.drawString(0, 0, "FINISH (N)");
+      char headerStr[16];
+      int queueSize = stopWatch.getQueueSize();
+      snprintf(headerStr, sizeof(headerStr), "FINISH (%d)", queueSize);
+      dp.drawString(0, 0, headerStr);
     }
 
     dp.setTextAlignment(TEXT_ALIGN_RIGHT);
     dp.setFont(ArialMT_Plain_10);
-    dp.drawString(128, 0, String(battery.getPercentage()) + "%");
+    dp.drawString(128, 0, batteryStr);
 
     dp.setTextAlignment(TEXT_ALIGN_CENTER);
     dp.setFont(ArialMT_Plain_10);
-    dp.drawString(64, 25, stopWatch.draw());
+    dp.drawString(64, 25, timeStr);
 
     dp.setTextAlignment(TEXT_ALIGN_LEFT);
     dp.setFont(ArialMT_Plain_10);
+    dp.drawString(0, 54, uptimeStr);
 
-    if (timeSync.isInit()) {
-      dp.drawString(0, 54, "synced - UpTime: " + String(currentMillis / 1000) + "s");
-      digitalWrite(SYNC_LED_PIN, HIGH);
-    } else {
-      dp.drawString(0, 54, "UpTime: " + String(currentMillis / 1000) + "s");
-      digitalWrite(SYNC_LED_PIN, LOW);
-    }
+    digitalWrite(SYNC_LED_PIN, timeSync.isInit() ? HIGH : LOW);
 
     dp.display();
   }
 
-  if (buttonTriggered) {
+  handleButtonStateMachine(currentMillis);
 
-    buttonTriggered = false;
-
-    unsigned long pressStart = millis();
-
-    while (digitalRead(BUTTON_PIN) == LOW) {
-
-      if (millis() - pressStart >= 5000) {
-
-        while (digitalRead(BUTTON_PIN) == LOW) {
-          delay(10);
-        }
-
-        powerDownAndSleep();
-
-        return;
-      }
-
-      delay(10);
-    }
-
-    unsigned long duration = millis() - pressStart;
-
-    if (duration >= 2500) {
-
-      stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
-      stopWatch.reset();
-
-    } else {
-
-      if (currentMillis - lastButtonPress > 200) {
-        lastButtonPress = currentMillis;
-        stopWatch.triggerFinish(&fs_instance);
-      }
-    }
-  }
-
-  if (lora.available()) {
-
-    lora.getPacket(msg, len, rssi, snr);
+  if (lora.tryGetPacket(msg, sizeof(msg), len, rssi, snr, rxTs)) {
 
     Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
 
     if (strncmp(msg, "sync:", 5) == 0) {
-      timeSync.syncTime(atoll(&msg[5]), &stopWatch);
-    } else {
+
+      uint64_t t1 = strtoull(&msg[5], nullptr, 10);
+      if (timeSync.onSyncMsg(t1, rxTs, &stopWatch)) {
+
+        char ack[32];
+        snprintf(ack, sizeof(ack), "syncack:%llu", t1);
+        lora.sendData(ack);
+        Serial.printf("[TIMESYNC] syncack sent for t1=%llu\n", t1);
+      }
+
+    } else if (strncmp(msg, "syncfin:", 8) == 0) {
+
+      uint64_t t1 = 0;
+      int64_t halfRtt = 0;
+      sscanf(&msg[8], "%llu:%lld", &t1, &halfRtt);
+      timeSync.onSyncFinMsg(t1, halfRtt, &stopWatch);
+
+    } else if (strncmp(msg, "time:", 5) == 0) {
 
       if (timeSync.isInit()) {
-        stopWatch.triggerStart(atoll(msg));
+        uint64_t startTs = strtoull(&msg[5], nullptr, 10);
+        stopWatch.triggerStart(startTs);
       }
     }
   }

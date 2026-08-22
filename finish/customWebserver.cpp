@@ -27,10 +27,19 @@ void CustomWebserver::data_handler(AsyncWebServerRequest *request) {
     return;
   }
 
-  String data = fs_instance->readAll();
-
-  AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", data);
+  AsyncResponseStream *response = request->beginResponseStream("text/plain");
   response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+
+  bool success = fs_instance->readInChunks(
+    [response](const char *data, size_t length) -> bool {
+      response->write((const uint8_t *)data, length);
+      return true;
+    });
+
+  if (!success) {
+    response->print("Error reading data");
+  }
+
   request->send(response);
 }
 
@@ -43,6 +52,34 @@ void CustomWebserver::reset_handler(AsyncWebServerRequest *request) {
 
     AsyncWebServerResponse *response = request->beginResponse(500, "text/plain", "Error");
     request->send(response);
+  }
+}
+
+void CustomWebserver::status_handler(AsyncWebServerRequest *request) {
+  if (sw_instance == nullptr) {
+    request->send(500, "text/plain", "No SW instance");
+    return;
+  }
+  const char *mode = sw_instance->isContinuousMode() ? "continuous" : "normal";
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", mode);
+  response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  request->send(response);
+}
+
+void CustomWebserver::discard_handler(AsyncWebServerRequest *request) {
+
+  if (sw_instance == nullptr) {
+    request->send(500, "text/plain", "No SW instance");
+    return;
+  }
+  if (sw_instance->isContinuousMode()) {
+    request->send(400, "text/plain", "Not applicable in continuous mode");
+    return;
+  }
+  if (sw_instance->discardOldestStart()) {
+    request->send(200, "text/plain", "OK");
+  } else {
+    request->send(400, "text/plain", "Queue empty");
   }
 }
 
@@ -93,6 +130,14 @@ void CustomWebserver::init(CFs *fs_inst, StopWatch *sw_inst) {
 
   server->on("/reset", HTTP_GET, [this](AsyncWebServerRequest *request) {
     this->reset_handler(request);
+  });
+
+  server->on("/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    this->status_handler(request);
+  });
+
+  server->on("/discard", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    this->discard_handler(request);
   });
 
   server->on("/enableContinuousMode", HTTP_GET, [this](AsyncWebServerRequest *request) {
