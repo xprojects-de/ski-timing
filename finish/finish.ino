@@ -261,9 +261,11 @@ void loop() {
       sscanf(&msg[8], "%llu:%lld", &t1, &halfRtt);
       timeSync.onSyncFinMsg(t1, halfRtt, &stopWatch);
 
-    } else {
+    } else if (strncmp(msg, "time:", 5) == 0) {
+
       if (timeSync.isInit()) {
-        stopWatch.triggerStart(strtoull(msg, nullptr, 10));
+        uint64_t startTs = strtoull(&msg[5], nullptr, 10);
+        stopWatch.triggerStart(startTs);
       }
     }
   }
