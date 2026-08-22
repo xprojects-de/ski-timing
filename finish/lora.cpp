@@ -26,7 +26,7 @@ static RadioEvents_t RadioEvents;
 volatile bool _radioBusy = false;
 volatile bool _rxActive = false;
 
-static uint64_t _timestampCache[TIMESTAMP_CACHE_SIZE] = {0};
+static uint64_t _timestampCache[TIMESTAMP_CACHE_SIZE] = { 0 };
 static uint8_t _timestampCacheIndex = 0;
 
 QueueHandle_t Lora::_txQueue = NULL;
