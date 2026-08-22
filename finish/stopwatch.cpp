@@ -1,7 +1,7 @@
 #include "stopwatch.h"
 
 #define START_TIME_QUEUE_DEPTH 3
-#define DEBOUNCE_TIME_NORMAL_US 500000
+#define DEBOUNCE_TIME_NORMAL_US 1000000
 #define DEBOUNCE_TIME_CONTINUOUS_US 50000
 
 StopWatch::StopWatch() {
