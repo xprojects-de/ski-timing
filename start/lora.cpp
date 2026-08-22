@@ -25,6 +25,8 @@
 #define LORA_PREFIX "ST-"
 #define PREFIX_LEN 3
 
+#define BURST_COUNT 3
+
 static RadioEvents_t RadioEvents;
 
 char _rxBuffer[BUFFER_SIZE];
@@ -34,6 +36,7 @@ int8_t _lastSnr = 0;
 volatile bool _packetReceived = false;
 volatile bool _radioBusy = false;
 volatile bool _rxActive = false;
+
 
 SemaphoreHandle_t Lora::_dataMutex = NULL;
 QueueHandle_t Lora::_txQueue = NULL;
@@ -116,14 +119,28 @@ void Lora::startTask(UBaseType_t priority, BaseType_t coreID) {
   }
 }
 
-void Lora::sendData(const char *data) {
+void Lora::sendData(const char *data, bool burst) {
   if (_txQueue == NULL) return;
 
   char txBuf[BUFFER_SIZE];
   snprintf(txBuf, BUFFER_SIZE, "%s%s", LORA_PREFIX, data);
 
-  if (xQueueSend(_txQueue, txBuf, 0) != pdTRUE) {
-    Serial.println("[LORA] WARNING: TX queue full, message dropped!");
+  if (burst) {
+
+    int sentCount = 0;
+    for (int i = 0; i < BURST_COUNT; i++) {
+      if (xQueueSend(_txQueue, txBuf, pdMS_TO_TICKS(100)) == pdTRUE) {
+        sentCount++;
+      } else {
+        Serial.printf("[LORA] Burst %d/%d: Queue full!\n", i + 1, BURST_COUNT);
+        break;
+      }
+    }
+    Serial.printf("[LORA] Burst: %d/%d packages put to queue\n", sentCount, BURST_COUNT);
+  } else {
+    if (xQueueSend(_txQueue, txBuf, 0) != pdTRUE) {
+      Serial.println("[LORA] WARNING: TX queue full, message dropped!");
+    }
   }
 }
 

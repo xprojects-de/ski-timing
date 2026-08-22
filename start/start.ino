@@ -34,6 +34,7 @@ int16_t rxLen;
 int16_t rxRssi;
 int8_t rxSnr;
 
+
 // Initialized to trigger the first sync immediately on startup.
 // (unsigned underflow is well-defined in C/C++)
 unsigned long lastSyncTime = (unsigned long)(0UL - SYNC_INTERVAL_MS);
@@ -86,7 +87,7 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           uint64_t capturedMicros = buttonPressMicros;
           interrupts();
           snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", capturedMicros);
-          lora.sendData(timeTriggerStr);
+          lora.sendData(timeTriggerStr, true);
           Serial.printf("[BTN] Start trigger sent: %s\n", timeTriggerStr);
         }
 

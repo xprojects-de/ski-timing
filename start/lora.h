@@ -23,7 +23,7 @@ public:
   void startTask(UBaseType_t priority = 2, BaseType_t coreID = 1);
   void proccess();
 
-  void sendData(const char* data);
+  void sendData(const char* data, bool burst = false);
 
   bool tryGetPacket(char* buffer, size_t bufferSize, int16_t& size, int16_t& rssi, int8_t& snr);
 
