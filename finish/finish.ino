@@ -95,6 +95,17 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
           stopWatch.reset();
           Serial.printf("[BTN] Mode changed to: %s\n", stopWatch.isContinuousMode() ? "Continuous" : "Normal");
+        } else if (duration >= 1000) {
+
+          if (!stopWatch.isContinuousMode()) {
+            if (stopWatch.discardOldestStart()) {
+              Serial.println("[BTN] Fall detected: Start time removed.");
+            } else {
+              Serial.println("[BTN] Fall detected: no startTime in queue!");
+            }
+          } else {
+            Serial.println("[BTN] Fall detected: not possible in continuousMode.");
+          }
         } else if (duration >= 30) {
           // Read 64-bit volatile in a critical section to avoid torn reads
           noInterrupts();

@@ -27,6 +27,7 @@ public:
   bool isContinuousMode();
   bool reset();
   int getQueueSize();
+  bool discardOldestStart();
 
   static String formatTime(int64_t ms);
 };

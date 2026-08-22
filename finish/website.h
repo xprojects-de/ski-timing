@@ -12,10 +12,15 @@ const char index_html[] PROGMEM = R"rawliteral(
         .tabelle th { background-color: #04AA6D; color: white; position: sticky; top: 0; }
         .tabelle tr:nth-child(even) { background-color: #f9f9f9; }
         .tabelle tr:hover { background-color: #f1f1f1; }
+        .btn { padding: 12px 24px; font-size: 1.1em; margin: 15px auto; border: none; border-radius: 5px; cursor: pointer; display: block; width: 95%; max-width: 600px; }
+        .btn-danger { background-color: #f44336; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .btn-danger:hover { background-color: #da190b; }
+        .btn-danger:disabled { background-color: #aaa; cursor: not-allowed; }
     </style>
 </head>
 <body>
     <h1>Ski Timing</h1>
+    <button class="btn btn-danger" id="discardBtn" onclick="discardStarter()">Sturz: Läufer aus Queue entfernen</button>
     <table class="tabelle" id="results">
         </table>
 
@@ -87,6 +92,27 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         setInterval(updateTable, 3000);
         updateTable();
+
+        function discardStarter() {
+          if (!confirm("Älteste Startzeit verwerfen?\n(z.B. wegen Sturz oder Fehlstart)\n\nDiese Aktion kann nicht rückgängig gemacht werden!")) return;
+          const btn = document.getElementById('discardBtn');
+          btn.disabled = true;
+          fetch('/discard')
+            .then(response => {
+              if (response.ok) {
+                updateTable();
+              } else {
+                response.text().then(msg => alert("Fehler: " + msg));
+              }
+            })
+            .catch(err => {
+              console.error("Netzwerkfehler:", err);
+              alert("Verbindung zum Zeitmessgerät verloren!");
+            })
+            .finally(() => {
+              btn.disabled = false;
+            });
+        }
     </script>
 </body>
 </html>

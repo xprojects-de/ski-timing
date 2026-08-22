@@ -22,6 +22,7 @@ public:
   void index_handler(AsyncWebServerRequest *request);
   void data_handler(AsyncWebServerRequest *request);
   void reset_handler(AsyncWebServerRequest *request);
+  void discard_handler(AsyncWebServerRequest *request);
   void enableContinuousMode_handler(AsyncWebServerRequest *request);
   void disableContinuousMode_handler(AsyncWebServerRequest *request);
 };

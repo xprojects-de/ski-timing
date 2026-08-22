@@ -148,3 +148,16 @@ int StopWatch::getQueueSize() {
   if (_startTimeQueue == NULL) return 0;
   return uxQueueMessagesWaiting(_startTimeQueue);
 }
+
+bool StopWatch::discardOldestStart() {
+  if (_startTimeQueue == NULL) return false;
+
+  int64_t discardedTime;
+  if (xQueueReceive(_startTimeQueue, &discardedTime, 0) == pdTRUE) {
+    Serial.printf("[STOPWATCH] Fall detected: remove oldest startTime (%lld us)\n", discardedTime);
+    return true;
+  }
+  Serial.println("[STOPWATCH] discardOldestStart: Queue still empty.");
+  return false;
+}
+

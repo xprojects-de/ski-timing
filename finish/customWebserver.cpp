@@ -55,6 +55,23 @@ void CustomWebserver::reset_handler(AsyncWebServerRequest *request) {
   }
 }
 
+void CustomWebserver::discard_handler(AsyncWebServerRequest *request) {
+
+  if (sw_instance == nullptr) {
+    request->send(500, "text/plain", "No SW instance");
+    return;
+  }
+  if (sw_instance->isContinuousMode()) {
+    request->send(400, "text/plain", "Not applicable in continuous mode");
+    return;
+  }
+  if (sw_instance->discardOldestStart()) {
+    request->send(200, "text/plain", "OK");
+  } else {
+    request->send(400, "text/plain", "Queue empty");
+  }
+}
+
 void CustomWebserver::enableContinuousMode_handler(AsyncWebServerRequest *request) {
   if (sw_instance != nullptr) {
 
@@ -102,6 +119,10 @@ void CustomWebserver::init(CFs *fs_inst, StopWatch *sw_inst) {
 
   server->on("/reset", HTTP_GET, [this](AsyncWebServerRequest *request) {
     this->reset_handler(request);
+  });
+
+  server->on("/discard", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    this->discard_handler(request);
   });
 
   server->on("/enableContinuousMode", HTTP_GET, [this](AsyncWebServerRequest *request) {
