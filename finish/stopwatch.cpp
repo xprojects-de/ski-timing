@@ -3,9 +3,7 @@
 #define START_TIME_QUEUE_DEPTH 3
 
 StopWatch::StopWatch() {
-  _startTime = 0;
   _lastTime = 0;
-  _isRunning = false;
   _offset = 0;
   _isContinuousMode = false;
   _startTimeQueue = xQueueCreate(START_TIME_QUEUE_DEPTH, sizeof(int64_t));
@@ -28,22 +26,13 @@ int64_t StopWatch::getSyncedMicros() {
 
 void StopWatch::triggerStart(uint64_t time) {
 
-  if (_isContinuousMode) {
+  if (_startTimeQueue == NULL) return;
 
-    if (!_isRunning) {
-      _startTime = (int64_t)time;
-      _isRunning = true;
-    }
+  int64_t startTime = (int64_t)time;
+  if (xQueueSend(_startTimeQueue, &startTime, 0) != pdTRUE) {
+    Serial.println("[STOPWATCH] WARNING: Maximum 3 parallel events! Start ignoriert.");
   } else {
-
-    if (_startTimeQueue == NULL) return;
-
-    int64_t startTime = (int64_t)time;
-    if (xQueueSend(_startTimeQueue, &startTime, 0) != pdTRUE) {
-      Serial.println("[STOPWATCH] WARNING: Maximum 3 parallel events! Start ignoriert.");
-    } else {
-      Serial.printf("[STOPWATCH] Added start time to queue. Queue size: %d\n", uxQueueMessagesWaiting(_startTimeQueue));
-    }
+    Serial.printf("[STOPWATCH] Added start time to queue. Queue size: %d\n", uxQueueMessagesWaiting(_startTimeQueue));
   }
 }
 
@@ -59,40 +48,34 @@ void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp)
   // were booted at different times.
   const int64_t syncedTimestamp = (int64_t)timestamp + _offset;
 
+  if (_startTimeQueue == NULL) return;
+
+  int64_t startTime;
+
   if (_isContinuousMode) {
 
-    if (!_isRunning) {
+    if (xQueuePeek(_startTimeQueue, &startTime, 0) != pdTRUE) {
 
-      _startTime = syncedTimestamp;
-      _isRunning = true;
+      if (xQueueSend(_startTimeQueue, &syncedTimestamp, 0) == pdTRUE) {
+        Serial.println("[STOPWATCH] Continuous mode: Start time set (queue was empty)");
+      }
 
-    } else {
-
-      int64_t elapsed = syncedTimestamp - _startTime;
-
-      _lastTime = elapsed / 1000;
-
-      fs_instance->append(_lastTime);
+      return;
     }
-
   } else {
 
-    if (_startTimeQueue == NULL) return;
-
-    int64_t startTime;
     if (xQueueReceive(_startTimeQueue, &startTime, 0) != pdTRUE) {
       Serial.println("[STOPWATCH] No start time in queue, finish ignored");
       return;
     }
-
-    int64_t elapsed = syncedTimestamp - startTime;
-
-    _lastTime = elapsed / 1000;
-
-    fs_instance->append(_lastTime);
-
-    Serial.printf("[STOPWATCH] Finish recorded: %lld ms. Queue size: %d\n", _lastTime, uxQueueMessagesWaiting(_startTimeQueue));
   }
+
+  int64_t elapsed = syncedTimestamp - startTime;
+  _lastTime = elapsed / 1000;
+
+  fs_instance->append(_lastTime);
+
+  Serial.printf("[STOPWATCH] Finish recorded: %lld ms. Queue size: %d\n", _lastTime, uxQueueMessagesWaiting(_startTimeQueue));
 }
 
 String StopWatch::formatTime(int64_t ms) {
@@ -111,24 +94,12 @@ String StopWatch::draw() {
 
   int64_t currentElapsed = 0;
 
-  if (_isContinuousMode) {
-
-    if (_isRunning) {
+  if (_startTimeQueue != NULL) {
+    int64_t oldestStartTime;
+    if (xQueuePeek(_startTimeQueue, &oldestStartTime, 0) == pdTRUE) {
       int64_t currentTime = getSyncedMicros();
-      if (currentTime > _startTime) {
-        currentElapsed = (currentTime - _startTime) / 1000;
-      }
-    }
-  } else {
-
-    if (_startTimeQueue != NULL) {
-
-      int64_t oldestStartTime;
-      if (xQueuePeek(_startTimeQueue, &oldestStartTime, 0) == pdTRUE) {
-        int64_t currentTime = getSyncedMicros();
-        if (currentTime > oldestStartTime) {
-          currentElapsed = (currentTime - oldestStartTime) / 1000;
-        }
+      if (currentTime > oldestStartTime) {
+        currentElapsed = (currentTime - oldestStartTime) / 1000;
       }
     }
   }
@@ -153,8 +124,6 @@ bool StopWatch::isContinuousMode() {
 
 bool StopWatch::reset() {
   _lastTime = 0;
-  _isRunning = false;
-  _startTime = 0;
 
   if (_startTimeQueue != NULL) {
     xQueueReset(_startTimeQueue);

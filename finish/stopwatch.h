@@ -8,9 +8,7 @@
 class StopWatch {
 
 private:
-  int64_t _startTime;
   int64_t _lastTime;
-  bool _isRunning;
   int64_t _offset;
   bool _isContinuousMode;
   QueueHandle_t _startTimeQueue;
