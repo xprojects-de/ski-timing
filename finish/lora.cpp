@@ -16,6 +16,7 @@
 #define BUFFER_SIZE 64
 #define TX_QUEUE_DEPTH 4
 #define RX_QUEUE_DEPTH 10
+#define TIMESTAMP_CACHE_SIZE 20
 
 #define LORA_PREFIX "ST-"
 #define PREFIX_LEN 3
@@ -24,6 +25,9 @@ static RadioEvents_t RadioEvents;
 
 volatile bool _radioBusy = false;
 volatile bool _rxActive = false;
+
+static uint64_t _timestampCache[TIMESTAMP_CACHE_SIZE] = {0};
+static uint8_t _timestampCacheIndex = 0;
 
 SemaphoreHandle_t Lora::_dataMutex = NULL;
 QueueHandle_t Lora::_txQueue = NULL;
@@ -186,30 +190,22 @@ void Lora::OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
 
       uint64_t timestamp = strtoull(&rxBuffer[5], NULL, 10);
 
-      if (_rxQueue != NULL) {
-        UBaseType_t queueCount = uxQueueMessagesWaiting(_rxQueue);
-        LoraRxPacket tempPackets[RX_QUEUE_DEPTH];
-
-        for (UBaseType_t i = 0; i < queueCount; i++) {
-          if (xQueueReceive(_rxQueue, &tempPackets[i], 0) == pdTRUE) {
-
-            if (strncmp(tempPackets[i].data, "time:", 5) == 0) {
-              uint64_t queueTimestamp = strtoull(&tempPackets[i].data[5], NULL, 10);
-              if (queueTimestamp == timestamp) {
-                isDuplicate = true;
-                Serial.printf("[LORA] Duplicate time:%ll skipped (in Queue)\n", timestamp);
-              }
-            }
-          }
+      for (uint8_t i = 0; i < TIMESTAMP_CACHE_SIZE; i++) {
+        if (_timestampCache[i] == timestamp) {
+          isDuplicate = true;
+          Serial.printf("[LORA] Duplikat time:%llu skip (Cache)\n", timestamp);
+          break;
         }
+      }
 
-        for (UBaseType_t i = 0; i < queueCount; i++) {
-          xQueueSend(_rxQueue, &tempPackets[i], 0);
-        }
+      if (!isDuplicate) {
+        _timestampCache[_timestampCacheIndex] = timestamp;
+        _timestampCacheIndex = (_timestampCacheIndex + 1) % TIMESTAMP_CACHE_SIZE;
       }
     }
 
     if (!isDuplicate && _rxQueue != NULL) {
+
       LoraRxPacket packet;
       memcpy(packet.data, rxBuffer, copySize + 1);
       packet.size = (int16_t)copySize;
