@@ -12,6 +12,7 @@ private:
   int64_t _offset;
   bool _isContinuousMode;
   QueueHandle_t _startTimeQueue;
+  uint64_t _lastFinishTimestamp;
 
 public:
   StopWatch();
