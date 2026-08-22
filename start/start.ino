@@ -35,10 +35,6 @@ int16_t rxRssi;
 int8_t rxSnr;
 uint64_t rxTs = 0;
 int syncSamplesCompleted = 0;
-bool syncDone = false;
-
-// Must match TIMESYNC_SAMPLES in finish/timesync.h
-static const int SYNC_SAMPLES_REQUIRED = 15;
 
 unsigned long lastSyncTime = (unsigned long)(0UL - SYNC_INTERVAL_MS);
 unsigned long lastDisplayUpdate = 0;
@@ -205,11 +201,9 @@ void loop() {
 
     dp.setTextAlignment(TEXT_ALIGN_LEFT);
     dp.setFont(ArialMT_Plain_16);
-    if (syncDone) {
-      dp.drawString(0, 0, "START S:OK");
-    } else if (syncSamplesCompleted > 0) {
-      char hdr[22];
-      snprintf(hdr, sizeof(hdr), "START S:%d/%d", syncSamplesCompleted, SYNC_SAMPLES_REQUIRED);
+    if (syncSamplesCompleted > 0) {
+      char hdr[20];
+      snprintf(hdr, sizeof(hdr), "START (%d)", syncSamplesCompleted);
       dp.drawString(0, 0, hdr);
     } else {
       dp.drawString(0, 0, "START");
@@ -254,18 +248,8 @@ void loop() {
       snprintf(finMsg, sizeof(finMsg), "syncfin:%llu:%lld", t1, halfRtt);
       lora.sendData(finMsg);
 
-      if (syncDone) {
-
-        Serial.println("[SYNC] Re-sync detected (finish rebooted) — resetting sync counter");
-        syncDone = false;
-        syncSamplesCompleted = 0;
-      }
       syncSamplesCompleted++;
-      if (syncSamplesCompleted >= SYNC_SAMPLES_REQUIRED) {
-        syncDone = true;
-      }
-
-      Serial.printf("[SYNC] syncfin sent: t1=%llu  t4=%llu  half_rtt=%lld us  (%d/%d samples)\n", t1, t4, halfRtt, syncSamplesCompleted, SYNC_SAMPLES_REQUIRED);
+      Serial.printf("[SYNC] syncfin sent: t1=%llu  t4=%llu  half_rtt=%lld us  (sample %d)\n", t1, t4, halfRtt, syncSamplesCompleted);
     }
   }
 
