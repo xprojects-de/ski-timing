@@ -216,7 +216,10 @@ void loop() {
     if (stopWatch.isContinuousMode()) {
       dp.drawString(0, 0, "FINISH (C)");
     } else {
-      dp.drawString(0, 0, "FINISH (N)");
+      char headerStr[16];
+      int queueSize = stopWatch.getQueueSize();
+      snprintf(headerStr, sizeof(headerStr), "FINISH (%d)", queueSize);
+      dp.drawString(0, 0, headerStr);
     }
 
     dp.setTextAlignment(TEXT_ALIGN_RIGHT);

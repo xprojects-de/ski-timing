@@ -3,6 +3,7 @@
 
 #include <Wire.h>
 #include "customFilesystem.h"
+#include <freertos/queue.h>
 
 class StopWatch {
 
@@ -12,6 +13,7 @@ private:
   bool _isRunning;
   int64_t _offset;
   bool _isContinuousMode;
+  QueueHandle_t _startTimeQueue;
 
 public:
   StopWatch();
@@ -26,6 +28,7 @@ public:
   void setContinuousMode(bool continuousMode);
   bool isContinuousMode();
   bool reset();
+  int getQueueSize();
 
   static String formatTime(int64_t ms);
 };
