@@ -86,9 +86,13 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           noInterrupts();
           uint64_t capturedMicros = buttonPressMicros;
           interrupts();
+
+          char startMsg[40];
+          snprintf(startMsg, sizeof(startMsg), "time:%llu", capturedMicros);
           snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", capturedMicros);
-          lora.sendData(timeTriggerStr, true);
-          Serial.printf("[BTN] Start trigger sent: %s\n", timeTriggerStr);
+
+          lora.sendData(startMsg, true);
+          Serial.printf("[BTN] Start-Trigger (Burst): %s\n", startMsg);
         }
 
         buttonState = BTN_IDLE;
