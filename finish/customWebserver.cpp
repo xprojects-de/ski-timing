@@ -60,7 +60,7 @@ void CustomWebserver::status_handler(AsyncWebServerRequest *request) {
     request->send(500, "text/plain", "No SW instance");
     return;
   }
-  const char* mode = sw_instance->isContinuousMode() ? "continuous" : "normal";
+  const char *mode = sw_instance->isContinuousMode() ? "continuous" : "normal";
   AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", mode);
   response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   request->send(response);

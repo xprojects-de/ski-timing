@@ -160,4 +160,3 @@ bool StopWatch::discardOldestStart() {
   Serial.println("[STOPWATCH] discardOldestStart: Queue still empty.");
   return false;
 }
-
