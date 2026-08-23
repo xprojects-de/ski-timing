@@ -113,6 +113,10 @@ void CustomWebserver::disableContinuousMode_handler(AsyncWebServerRequest *reque
   }
 }
 
+void CustomWebserver::ping_handler(AsyncWebServerRequest *request) {
+  request->send(200, "text/plain", "OK");
+}
+
 void CustomWebserver::init(CFs *fs_inst, StopWatch *sw_inst) {
 
   fs_instance = fs_inst;
@@ -146,6 +150,10 @@ void CustomWebserver::init(CFs *fs_inst, StopWatch *sw_inst) {
 
   server->on("/disableContinuousMode", HTTP_GET, [this](AsyncWebServerRequest *request) {
     this->disableContinuousMode_handler(request);
+  });
+
+  server->on("/ping", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    this->ping_handler(request);
   });
 
   server->onNotFound([](AsyncWebServerRequest *request) {

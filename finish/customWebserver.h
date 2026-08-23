@@ -26,6 +26,7 @@ public:
   void status_handler(AsyncWebServerRequest *request);
   void enableContinuousMode_handler(AsyncWebServerRequest *request);
   void disableContinuousMode_handler(AsyncWebServerRequest *request);
+  void ping_handler(AsyncWebServerRequest *request);
 };
 
 #endif
