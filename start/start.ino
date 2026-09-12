@@ -6,6 +6,7 @@
 
 #define BUTTON_PIN 0
 #define SYNC_INTERVAL_MS 5000
+#define HEAP_LOG_INTERVAL_MS 60000  // diagnostic: watch for heap fragmentation over long runtimes
 
 // Button hold-time thresholds (ms)
 #define BTN_MIN_VALID_PRESS_MS 30     // ignore glitches/bounce shorter than this
@@ -43,6 +44,7 @@ int syncSamplesCompleted = 0;
 
 unsigned long lastSyncTime = (unsigned long)(0UL - SYNC_INTERVAL_MS);
 unsigned long lastDisplayUpdate = 0;
+unsigned long lastHeapLogTime = 0;
 
 #define BURST_COOLDOWN_MS 2000
 unsigned long lastBurstTime = 0;
@@ -194,6 +196,12 @@ void loop() {
   }
 
   handleButtonStateMachine(currentMillis);
+
+  if (currentMillis - lastHeapLogTime >= HEAP_LOG_INTERVAL_MS) {
+    lastHeapLogTime = currentMillis;
+    Serial.printf("[HEAP] free=%u min=%u maxAlloc=%u\n",
+                  ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+  }
 
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
     lastDisplayUpdate = currentMillis;

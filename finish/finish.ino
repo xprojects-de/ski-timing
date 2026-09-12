@@ -12,6 +12,7 @@
 
 #define BUTTON_PIN 0
 #define SYNC_LED_PIN 35
+#define HEAP_LOG_INTERVAL_MS 60000  // diagnostic: watch for heap fragmentation over long runtimes
 
 // Button hold-time thresholds (ms)
 #define BTN_MIN_VALID_PRESS_MS 30     // ignore glitches/bounce shorter than this
@@ -32,6 +33,7 @@ BatteryCheck battery;
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
 unsigned long lastDisplayUpdate = 0;
+unsigned long lastHeapLogTime = 0;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
 
 enum ButtonState {
@@ -213,6 +215,12 @@ void setup() {
 
 void loop() {
   unsigned long currentMillis = millis();
+
+  if (currentMillis - lastHeapLogTime >= HEAP_LOG_INTERVAL_MS) {
+    lastHeapLogTime = currentMillis;
+    Serial.printf("[HEAP] free=%u min=%u maxAlloc=%u\n",
+                  ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+  }
 
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
     lastDisplayUpdate = currentMillis;
