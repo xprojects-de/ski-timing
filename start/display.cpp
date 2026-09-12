@@ -27,6 +27,6 @@ void Display::setTextAlignment(DISPLAY_TEXT_ALIGNMENT textAlignment) {
   displayF.setTextAlignment(textAlignment);
 }
 
-void Display::drawString(int16_t x, int16_t y, String text) {
+void Display::drawString(int16_t x, int16_t y, const char *text) {
   displayF.drawString(x, y, text);
 }

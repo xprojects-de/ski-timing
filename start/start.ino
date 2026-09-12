@@ -7,6 +7,11 @@
 #define BUTTON_PIN 0
 #define SYNC_INTERVAL_MS 5000
 
+// Button hold-time thresholds (ms)
+#define BTN_MIN_VALID_PRESS_MS 30     // ignore glitches/bounce shorter than this
+#define BTN_SHUTDOWN_ARM_HOLD_MS 7500 // still held beyond this arms deep-sleep on release
+#define BTN_RELEASE_DEBOUNCE_MS 50    // stable-release debounce before shutdown
+
 Display dp;
 Lora lora;
 BatteryCheck battery;
@@ -84,7 +89,7 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
         unsigned long duration = currentMillis - buttonPressStartTime;
 
-        if (duration >= 30 && !burstCooldownActive) {
+        if (duration >= BTN_MIN_VALID_PRESS_MS && !burstCooldownActive) {
           // Read 64-bit volatile in a critical section to avoid torn reads
           noInterrupts();
           uint64_t capturedMicros = buttonPressMicros;
@@ -103,7 +108,7 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
         buttonState = BTN_IDLE;
 
-      } else if (currentMillis - buttonPressStartTime >= 5000) {
+      } else if (currentMillis - buttonPressStartTime >= BTN_SHUTDOWN_ARM_HOLD_MS) {
         buttonState = BTN_WAITING_RELEASE;
       }
 
@@ -118,8 +123,8 @@ void handleButtonStateMachine(unsigned long currentMillis) {
       break;
 
     case BTN_DEBOUNCE_RELEASE:
-      // Wait 50 ms without blocking, then confirm stable release
-      if (currentMillis - buttonReleaseTime >= 50) {
+      // Wait BTN_RELEASE_DEBOUNCE_MS without blocking, then confirm stable release
+      if (currentMillis - buttonReleaseTime >= BTN_RELEASE_DEBOUNCE_MS) {
         if (digitalRead(BUTTON_PIN) == HIGH) {
           powerDownAndSleep();
         } else {
@@ -172,6 +177,7 @@ void setup() {
 
   dp.init();
   battery.init();
+  battery.startTask();
   lora.init();
   lora.startTask();
 
@@ -181,8 +187,6 @@ void setup() {
 void loop() {
 
   unsigned long currentMillis = millis();
-
-  battery.update(currentMillis);
 
   if (burstCooldownActive && (currentMillis - lastBurstTime >= BURST_COOLDOWN_MS)) {
     burstCooldownActive = false;
