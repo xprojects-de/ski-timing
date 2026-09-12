@@ -63,6 +63,9 @@ int CFs::getLastId() {
   return lastId;
 }
 
+int CFs::getCount() {
+  return _lastId;
+}
 
 bool CFs::clear() {
   if (!_initialized) return false;

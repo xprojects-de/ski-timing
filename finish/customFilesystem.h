@@ -19,6 +19,7 @@ public:
   bool isInit();
   bool append(int64_t time);
   bool clear();
+  int getCount();
 
   bool readInChunks(std::function<bool(const char* buffer, size_t length)> chunkCallback);
 };

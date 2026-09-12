@@ -87,6 +87,8 @@ void CustomWebserver::enableContinuousMode_handler(AsyncWebServerRequest *reques
   if (sw_instance != nullptr) {
 
     sw_instance->setContinuousMode(true);
+    sw_instance->reset();
+    if (fs_instance != nullptr) fs_instance->clear();
 
     AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "");
     request->send(response);
@@ -102,6 +104,8 @@ void CustomWebserver::disableContinuousMode_handler(AsyncWebServerRequest *reque
   if (sw_instance != nullptr) {
 
     sw_instance->setContinuousMode(false);
+    sw_instance->reset();
+    if (fs_instance != nullptr) fs_instance->clear();
 
     AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "");
     request->send(response);

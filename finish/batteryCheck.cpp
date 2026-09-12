@@ -2,7 +2,7 @@
 
 BatteryCheck::BatteryCheck(uint8_t adc_pin, uint8_t ctrl_pin, unsigned long interval_ms)
   : adcPin(adc_pin), ctrlPin(ctrl_pin), cachedVoltage(0), cachedPercentage(0),
-    lastCheckTime(0), checkInterval(interval_ms) {}
+    checkInterval(interval_ms) {}
 
 void BatteryCheck::init() {
 
@@ -13,8 +13,6 @@ void BatteryCheck::init() {
   analogSetPinAttenuation(adcPin, ADC_11db);
 
   forceUpdate();
-
-  lastCheckTime = millis();
 }
 
 uint16_t BatteryCheck::measureVoltage() {
@@ -74,28 +72,31 @@ void BatteryCheck::forceUpdate() {
   Serial.println(" %");
 }
 
-void BatteryCheck::update(unsigned long currentMillis) {
+void BatteryCheck::taskWorker(void *parameter) {
+  BatteryCheck *self = static_cast<BatteryCheck *>(parameter);
+  for (;;) {
+    vTaskDelay(pdMS_TO_TICKS(self->checkInterval));
+    self->forceUpdate();
+  }
+}
 
-  if (lastCheckTime == 0 || (currentMillis - lastCheckTime >= checkInterval)) {
-    lastCheckTime = currentMillis;
-    forceUpdate();
+void BatteryCheck::startTask(UBaseType_t priority, BaseType_t coreID) {
+  if (_taskHandle == NULL) {
+    xTaskCreatePinnedToCore(
+      taskWorker,
+      "BatteryTask",
+      2048,
+      this,
+      priority,
+      &_taskHandle,
+      coreID);
   }
 }
 
 uint8_t BatteryCheck::getPercentage() {
-
-  if (lastCheckTime == 0) {
-    forceUpdate();
-    lastCheckTime = millis();
-  }
   return cachedPercentage;
 }
 
 uint16_t BatteryCheck::getVoltage() {
-
-  if (lastCheckTime == 0) {
-    forceUpdate();
-    lastCheckTime = millis();
-  }
   return cachedVoltage;
 }

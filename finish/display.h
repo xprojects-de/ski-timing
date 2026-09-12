@@ -17,7 +17,7 @@ public:
   void display();
   void setFont(const uint8_t *fontData);
   void setTextAlignment(DISPLAY_TEXT_ALIGNMENT textAlignment);
-  void drawString(int16_t x, int16_t y, String text);
+  void drawString(int16_t x, int16_t y, const char *text);
 };
 
 #endif

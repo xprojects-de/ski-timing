@@ -12,6 +12,14 @@
 
 #define BUTTON_PIN 0
 #define SYNC_LED_PIN 35
+#define HEAP_LOG_INTERVAL_MS 60000  // diagnostic: watch for heap fragmentation over long runtimes
+
+// Button hold-time thresholds (ms)
+#define BTN_MIN_VALID_PRESS_MS 30     // ignore glitches/bounce shorter than this
+#define BTN_FALL_DETECT_HOLD_MS 1000  // hold to discard oldest queued start time
+#define BTN_MODE_TOGGLE_HOLD_MS 4000  // hold to toggle Normal/Continuous mode
+#define BTN_SHUTDOWN_ARM_HOLD_MS 7500 // still held beyond this arms deep-sleep on release
+#define BTN_RELEASE_DEBOUNCE_MS 50    // stable-release debounce before shutdown
 
 StopWatch stopWatch;
 Display dp;
@@ -25,6 +33,7 @@ BatteryCheck battery;
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
 unsigned long lastDisplayUpdate = 0;
+unsigned long lastHeapLogTime = 0;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
 
 enum ButtonState {
@@ -90,12 +99,13 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
         unsigned long duration = currentMillis - buttonPressStartTime;
 
-        if (duration >= 2500) {
+        if (duration >= BTN_MODE_TOGGLE_HOLD_MS) {
 
           stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
           stopWatch.reset();
-          Serial.printf("[BTN] Mode changed to: %s\n", stopWatch.isContinuousMode() ? "Continuous" : "Normal");
-        } else if (duration >= 1000) {
+          fs_instance.clear();
+          Serial.printf("[BTN] Mode changed to: %s (times cleared)\n", stopWatch.isContinuousMode() ? "Continuous" : "Normal");
+        } else if (duration >= BTN_FALL_DETECT_HOLD_MS) {
 
           if (!stopWatch.isContinuousMode()) {
             if (stopWatch.discardOldestStart()) {
@@ -106,7 +116,7 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           } else {
             Serial.println("[BTN] Fall detected: not possible in continuousMode.");
           }
-        } else if (duration >= 30) {
+        } else if (duration >= BTN_MIN_VALID_PRESS_MS) {
           // Read 64-bit volatile in a critical section to avoid torn reads
           noInterrupts();
           uint64_t capturedMicros = buttonPressMicros;
@@ -117,7 +127,7 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
         buttonState = BTN_IDLE;
 
-      } else if (currentMillis - buttonPressStartTime >= 5000) {
+      } else if (currentMillis - buttonPressStartTime >= BTN_SHUTDOWN_ARM_HOLD_MS) {
         buttonState = BTN_WAITING_RELEASE;
       }
 
@@ -131,8 +141,8 @@ void handleButtonStateMachine(unsigned long currentMillis) {
       break;
 
     case BTN_DEBOUNCE_RELEASE:
-      // Wait 50 ms without blocking, then confirm stable release
-      if (currentMillis - buttonReleaseTime >= 50) {
+      // Wait BTN_RELEASE_DEBOUNCE_MS without blocking, then confirm stable release
+      if (currentMillis - buttonReleaseTime >= BTN_RELEASE_DEBOUNCE_MS) {
         if (digitalRead(BUTTON_PIN) == HIGH) {
           powerDownAndSleep();
         } else {
@@ -199,6 +209,7 @@ void setup() {
   webserver.init(&fs_instance, &stopWatch);
 
   battery.init();
+  battery.startTask();
 
   dp.setFont(ArialMT_Plain_10);
 }
@@ -206,7 +217,11 @@ void setup() {
 void loop() {
   unsigned long currentMillis = millis();
 
-  battery.update(currentMillis);
+  if (currentMillis - lastHeapLogTime >= HEAP_LOG_INTERVAL_MS) {
+    lastHeapLogTime = currentMillis;
+    Serial.printf("[HEAP] free=%u min=%u maxAlloc=%u\n",
+                  ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+  }
 
   if (currentMillis - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
     lastDisplayUpdate = currentMillis;
@@ -226,7 +241,9 @@ void loop() {
     dp.setFont(ArialMT_Plain_16);
 
     if (stopWatch.isContinuousMode()) {
-      dp.drawString(0, 0, "FINISH (C)");
+      char headerStr[16];
+      snprintf(headerStr, sizeof(headerStr), "FINISH C:%d", fs_instance.getCount());
+      dp.drawString(0, 0, headerStr);
     } else {
       char headerStr[16];
       int queueSize = stopWatch.getQueueSize();
