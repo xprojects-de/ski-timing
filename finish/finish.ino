@@ -103,7 +103,8 @@ void handleButtonStateMachine(unsigned long currentMillis) {
 
           stopWatch.setContinuousMode(!stopWatch.isContinuousMode());
           stopWatch.reset();
-          Serial.printf("[BTN] Mode changed to: %s\n", stopWatch.isContinuousMode() ? "Continuous" : "Normal");
+          fs_instance.clear();
+          Serial.printf("[BTN] Mode changed to: %s (times cleared)\n", stopWatch.isContinuousMode() ? "Continuous" : "Normal");
         } else if (duration >= BTN_FALL_DETECT_HOLD_MS) {
 
           if (!stopWatch.isContinuousMode()) {
