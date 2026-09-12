@@ -232,7 +232,9 @@ void loop() {
     dp.setFont(ArialMT_Plain_16);
 
     if (stopWatch.isContinuousMode()) {
-      dp.drawString(0, 0, "FINISH (C)");
+      char headerStr[16];
+      snprintf(headerStr, sizeof(headerStr), "FINISH C:%d", fs_instance.getCount());
+      dp.drawString(0, 0, headerStr);
     } else {
       char headerStr[16];
       int queueSize = stopWatch.getQueueSize();
