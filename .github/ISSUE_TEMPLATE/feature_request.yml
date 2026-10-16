@@ -1,0 +1,45 @@
+name: Feature request
+description: Something is missing or should work differently
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describing the actual race-day situation behind the request usually helps more than a
+        ready-made implementation idea — this project grew out of concrete events, and "how does
+        it work at your club?" tends to lead to a better fit.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What doesn't work today, or only works in an awkward way?
+    validations:
+      required: true
+
+  - type: textarea
+    id: situation
+    attributes:
+      label: What's the concrete situation at your club/race?
+      description: |
+        Type of event, number of gates/stations, how start and finish are set up, who operates
+        the units.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Do you already have an idea of what it could look like?
+      description: Optional — "no idea, just needs to work somehow" is a valid answer too.
+
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you want to implement this yourself?
+      options:
+        - "No, just reporting it"
+        - "Maybe, with some guidance"
+        - "Yes, I'll open a pull request"
+    validations:
+      required: true

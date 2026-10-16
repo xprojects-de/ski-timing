@@ -1,0 +1,68 @@
+name: Bug report
+description: Something isn't working the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. Please don't paste real race data if you can avoid it — made-up
+        bib numbers and times work just as well for an example.
+
+        For security issues, please don't open an issue — use the path in
+        [SECURITY.md](../blob/main/SECURITY.md) instead.
+
+  - type: dropdown
+    id: unit
+    attributes:
+      label: Which unit?
+      options:
+        - Start
+        - Finish
+        - Both / LoRa sync between them
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: was-happens
+    attributes:
+      label: What happens?
+      description: And what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can it be reproduced?
+      placeholder: |
+        1. Power on start and finish unit
+        2. Wait for the sync LED to turn on
+        3. Press the start button
+        4. The finish unit shows ...
+    validations:
+      required: true
+
+  - type: input
+    id: board
+    attributes:
+      label: Board
+      placeholder: e.g. Heltec WiFi LoRa 32 (V3)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Firmware version / commit
+      description: The commit or tag you flashed, if known
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: |
+        Serial monitor output, a photo of the display, or anything else that helps. Was this
+        during an actual race, a test run, or just at your desk?

@@ -1,5 +1,25 @@
 # ski-timing
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Firmware: Arduino / ESP32](https://img.shields.io/badge/Firmware-Arduino%20%2F%20ESP32-blue.svg)](start)
+
+Firmware for a LoRa-based start/finish timing system for ski races and similar club
+competitions, running on Heltec WiFi LoRa 32 boards. A **start** unit and a **finish** unit talk
+to each other over LoRa: the start unit synchronizes its clock with the finish unit and sends a
+timestamp the moment the start button (or gate) is triggered, the finish unit timestamps the
+finish trigger the same way and keeps a queue of elapsed times. Everything runs standalone on
+battery power, with an OLED status display and no need for a network or the internet.
+
+The finish unit's built-in web page (its own WiFi access point) can download the recorded times
+as a simple `id,time` CSV. That raw export is exactly the kind of timing-device output
+[Alpdesk Time Control](https://github.com/xprojects-de/alpdesk-time-control) — our sister project
+for running the rest of a club competition (start lists, scoring, PDFs, live results) — can take
+in through its CSV import with column mapping.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build and submit changes, and
+[SECURITY.md](SECURITY.md) for the intended operating environment and how to report a
+vulnerability. This project follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Setup
 
 ### Arduino IDE
@@ -7,8 +27,8 @@
 Download and install https://www.arduino.cc/en/software/
 
 Unter preferences, add following URLs under  the "Additional Boards Manager URLs"
-- [https://resource.heltec.cn/download/package_heltec_esp32_index.json](https://espressif.github.io/arduino-esp32/package_esp32_index.json)
-- [https://dl.espressif.com/dl/package_esp32_index.json](https://resource.heltec.cn/download/package_heltec_esp32_index.json)
+- [https://espressif.github.io/arduino-esp32/package_esp32_index.json](https://espressif.github.io/arduino-esp32/package_esp32_index.json)
+- [https://resource.heltec.cn/download/package_heltec_esp32_index.json](https://resource.heltec.cn/download/package_heltec_esp32_index.json)
 
 Under Board-Maanger install following:
 - esp32 by espressif

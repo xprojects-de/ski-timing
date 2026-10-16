@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/xprojects-de/ski-timing/security/advisories/new
+    about: Please don't use a public issue for this — it goes privately to the maintainer instead.
+  - name: Alpdesk Time Control
+    url: https://github.com/xprojects-de/alpdesk-time-control
+    about: Looking for the scoring/results software this timing hardware feeds into? It lives in its own repository.

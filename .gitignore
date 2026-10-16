@@ -1,1 +1,15 @@
 /.idea/
+*.iml
+.vscode/
+*~
+*.swp
+*.swo
+
+# Arduino CLI build output, if used instead of/alongside the IDE
+build/
+
+# Operating system
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
