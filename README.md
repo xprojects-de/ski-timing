@@ -20,6 +20,23 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build and submit changes, and
 [SECURITY.md](SECURITY.md) for the intended operating environment and how to report a
 vulnerability. This project follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
+## Hardware
+
+Each unit needs an **ESP32-S3 "LoRa V4" board** matching the settings in [Arduino IDE](#arduino-ide)
+below (`REGION_EU868` → 868 MHz, the EU band). The links below are just example sources, not
+endorsements — any compatible LoRa V4 board works the same way:
+
+- [ESP32 LoRa V4 board, 2-pack](https://www.amazon.de/dp/B0FSQRQM7D) — base board, enough for the
+  start unit (no GPS needed there)
+- [ESP32 LoRa V4 board + GPS + 3000 mAh battery + case, 2-pack](https://www.amazon.de/dp/B0FS1WQWKF)
+  — the finish unit needs the GPS variant, since only it uses GPS-based time sync
+  ([gpsTime.cpp](finish/gpsTime.cpp))
+- [Roller-lever limit switch, NC+NO, 2-pack](https://www.amazon.de/dp/B09LCL36P2) — trigger switch
+  wired to `BUTTON_PIN`, e.g. for the start gate
+- [autosen AL012 laser retro-reflective sensor](https://autosen.com/en/Position-Sensors/Photoelectric-sensors/Laser-sensors/Laser-retro-reflective-sensor-AL012)
+  + [AA966 reflector](https://autosen.com/en/item/322) — laser light barrier at the finish line;
+  its switching output feeds `BUTTON_PIN` the same way the limit switch does
+
 ## Setup
 
 ### Arduino IDE
