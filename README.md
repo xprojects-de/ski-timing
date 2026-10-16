@@ -41,7 +41,36 @@ Under Library Manager, install following libraries
   - This also requires AsyncTCP library (https://github.com/me-no-dev/AsyncTCP)
 
 
-Select the right Board and settings under Tools (see image)
+Select the right Board and settings under Tools (see image). This project targets the **Heltec
+WiFi LoRa 32 (V4)** board; the settings used are:
+
+| Setting | Value |
+|---|---|
+| Board | `WiFi LoRa 32(V4)` |
+| USB CDC On Boot | `Enabled` |
+| CPU Frequency | `240MHz (WiFi)` |
+| Core Debug Level | `Info` |
+| USB DFU On Boot | `Disabled` |
+| Erase All Flash Before Sketch Upload | `Disabled` |
+| Events Run On | `Core 1` |
+| Flash Mode | `QIO 80MHz` |
+| Flash Size | `16MB (128Mb)` |
+| JTAG Adapter | `Disabled` |
+| Arduino Runs On | `Core 1` |
+| LoRaWan DevEUI | `CUSTOM` |
+| LoRaWan Preamble Length | `8 (default)` |
+| LoRaWan Region | `REGION_EU868` |
+| LoRaWan Debug Level | `None` |
+| USB Firmware MSC On Boot | `Disabled` |
+| Partition Scheme | `Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)` |
+| Upload Mode | `UART0 / Hardware CDC` |
+| Upload Speed | `115200` |
+| USB Mode | `Hardware CDC and JTAG` |
+| Zigbee Mode | `Disabled` |
+
+`LoRaWan Region` has to match the frequency band used in your country (`REGION_EU868` for
+Europe); `Port` depends on your machine — check *Tools → Port* for the entry that appears when the
+board is plugged in.
 
 ![Board Settings](settings/settings.png)
 
