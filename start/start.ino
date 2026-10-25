@@ -5,6 +5,8 @@
 #include <esp_timer.h>
 
 #define BUTTON_PIN 0
+#define TRIGGER_PIN 6  // external start switch, active LOW like the button (wiring: docs/hardware.md)
+#define TRIGGER_CONFIRM_US 10000  // the gate stays open, so a real start is still LOW after this; interference is not
 #define SYNC_INTERVAL_MS 5000
 #define HEAP_LOG_INTERVAL_MS 60000  // diagnostic: watch for heap fragmentation over long runtimes
 
@@ -19,6 +21,12 @@ BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
+
+// Set by the ISR on the first falling edge; cleared once the gate is closed again (input HIGH).
+volatile bool triggerInputFired = false;
+volatile uint64_t triggerInputMicros = 0;
+bool triggerInputHandled = false;
+
 const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
 
 enum ButtonState {
@@ -67,11 +75,59 @@ void IRAM_ATTR handleButtonPress() {
   }
 }
 
+void IRAM_ATTR handleTriggerInputFalling() {
+  if (!triggerInputFired) {
+    triggerInputMicros = esp_timer_get_time();
+    triggerInputFired = true;
+  }
+}
+
 void showChipId() {
   uint64_t chipId = ESP.getEfuseMac();
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
   Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+}
+
+void sendStartTrigger(uint64_t triggerMicros, unsigned long currentMillis, const char* logTag) {
+  char startMsg[40];
+  snprintf(startMsg, sizeof(startMsg), "time:%llu", triggerMicros);
+  snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", triggerMicros);
+
+  lora.sendData(startMsg, true);
+  Serial.printf("[%s] Start-Trigger (Burst): %s\n", logTag, startMsg);
+
+  lastBurstTime = currentMillis;
+  burstCooldownActive = true;
+}
+
+// The external input only triggers the start - no hold-time functions, the gate staying open must not put the
+// unit to sleep. The edge time is sent once the input is still LOW TRIGGER_CONFIRM_US later; the ISR is re-armed
+// only when the gate is closed again, so bounce cannot overwrite the time of the first contact.
+void handleTriggerInput(unsigned long currentMillis) {
+  if (!triggerInputFired) return;
+
+  noInterrupts();
+  uint64_t edgeMicros = triggerInputMicros;
+  interrupts();
+
+  if (esp_timer_get_time() - edgeMicros < TRIGGER_CONFIRM_US) return;
+
+  // HIGH again: the gate was closed for the next racer - or, if nothing was sent, it was interference
+  if (digitalRead(TRIGGER_PIN) == HIGH) {
+    triggerInputHandled = false;
+    triggerInputFired = false;  // re-arms the ISR
+    return;
+  }
+
+  if (triggerInputHandled) return;
+  triggerInputHandled = true;
+
+  if (burstCooldownActive) {
+    Serial.println("[TRIGGER] Start ignored: burst cooldown active");
+    return;
+  }
+  sendStartTrigger(edgeMicros, currentMillis, "TRIGGER");
 }
 
 void handleButtonStateMachine(unsigned long currentMillis) {
@@ -97,15 +153,7 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           uint64_t capturedMicros = buttonPressMicros;
           interrupts();
 
-          char startMsg[40];
-          snprintf(startMsg, sizeof(startMsg), "time:%llu", capturedMicros);
-          snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", capturedMicros);
-
-          lora.sendData(startMsg, true);
-          Serial.printf("[BTN] Start-Trigger (Burst): %s\n", startMsg);
-
-          lastBurstTime = currentMillis;
-          burstCooldownActive = true;
+          sendStartTrigger(capturedMicros, currentMillis, "BTN");
         }
 
         buttonState = BTN_IDLE;
@@ -150,6 +198,7 @@ void powerDownAndSleep() {
   delay(1000);
 
   detachInterrupt(BUTTON_PIN);
+  detachInterrupt(TRIGGER_PIN);
 
   dp.clear();
   dp.display();
@@ -177,6 +226,9 @@ void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
 
+  pinMode(TRIGGER_PIN, INPUT_PULLUP);  // backup for the external pull-up, keeps an unplugged input HIGH
+  attachInterrupt(TRIGGER_PIN, handleTriggerInputFalling, FALLING);
+
   dp.init();
   battery.init();
   battery.startTask();
@@ -196,6 +248,7 @@ void loop() {
   }
 
   handleButtonStateMachine(currentMillis);
+  handleTriggerInput(currentMillis);
 
   if (currentMillis - lastHeapLogTime >= HEAP_LOG_INTERVAL_MS) {
     lastHeapLogTime = currentMillis;
@@ -240,7 +293,9 @@ void loop() {
     lastSyncTime = currentMillis;
 
     if (!burstCooldownActive) {
-      snprintf(syncMsg, sizeof(syncMsg), "sync:%llu", (uint64_t)esp_timer_get_time());
+      // Same length as the finish's "syncack:<t1>": halfRtt assumes both legs take the same air time, and at
+      // SF10 a few bytes more can cost one more LoRa block (~65 ms) on one way.
+      snprintf(syncMsg, sizeof(syncMsg), "syncreq:%llu", (uint64_t)esp_timer_get_time());
       lora.sendData(syncMsg);
       Serial.printf("[SYNC] sync sent: %s\n", syncMsg);
     } else {

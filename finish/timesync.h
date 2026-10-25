@@ -37,11 +37,10 @@ public:
   Timesync();
   ~Timesync();
 
-  // Call when a "sync:<t1>" message is received.
+  // Call when a "syncreq:<t1>" message is received.
   // rxTimestamp = Lora::getRxTimestamp() — the finish-side receive time (t2).
-  // sw is only needed for reset-recovery (offset reset to 0).
   // Returns true if the caller should send a "syncack:<t1>" back to start.
-  bool onSyncMsg(uint64_t t1, uint64_t rxTimestamp, StopWatch* sw);
+  bool onSyncMsg(uint64_t t1, uint64_t rxTimestamp);
 
   // Call when a "syncfin:<t1>:<half_rtt>" message is received.
   void onSyncFinMsg(uint64_t t1, int64_t halfRtt, StopWatch* sw);

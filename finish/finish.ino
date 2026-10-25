@@ -11,6 +11,8 @@
 #include <esp_timer.h>
 
 #define BUTTON_PIN 0
+#define TRIGGER_PIN 6  // external light barrier via optocoupler, active LOW like the button (wiring: docs/hardware.md)
+#define TRIGGER_MIN_PULSE_US 1000  // shorter LOW pulses are interference on the cable (a leg in the beam: ~3 ms)
 #define SYNC_LED_PIN 35
 #define HEAP_LOG_INTERVAL_MS 60000  // diagnostic: watch for heap fragmentation over long runtimes
 
@@ -32,6 +34,13 @@ BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
+
+// Trigger input: the ISR reports a pulse at its rising edge, with the time of its falling edge, if it lasted
+// TRIGGER_MIN_PULSE_US. Shorter pulses - interference, bounce while releasing - are ignored.
+volatile uint64_t triggerFallMicros = 0;  // 0 = no falling edge seen since the last rising edge
+volatile bool triggerPending = false;
+volatile uint64_t triggerPulseMicros = 0;
+
 unsigned long lastDisplayUpdate = 0;
 unsigned long lastHeapLogTime = 0;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
@@ -62,6 +71,26 @@ void IRAM_ATTR handleButtonPress() {
   }
 }
 
+void IRAM_ATTR handleTriggerInputChange() {
+  uint64_t now = esp_timer_get_time();
+
+  if (digitalRead(TRIGGER_PIN) == LOW) {
+    triggerFallMicros = now;
+    return;
+  }
+
+  // A spike shorter than the ISR latency is already HIGH again when read and arrives here without its fall -
+  // it must not be reported with the fall time of an earlier pulse.
+  uint64_t fallMicros = triggerFallMicros;
+  triggerFallMicros = 0;
+  if (fallMicros == 0) return;
+
+  if (!triggerPending && now - fallMicros >= TRIGGER_MIN_PULSE_US) {
+    triggerPulseMicros = fallMicros;
+    triggerPending = true;
+  }
+}
+
 void VextON(void) {
   pinMode(Vext, OUTPUT);
   digitalWrite(Vext, LOW);
@@ -77,6 +106,22 @@ void showChipId() {
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
   Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+}
+
+// The external input only triggers the finish - no hold-time functions: a beam blocked for seconds (someone
+// standing in it, snow on the reflector) must not discard a start, switch the mode or put the unit to sleep.
+// A second break by legs or poles is dropped by the stopwatch debounce, shared with the button.
+void handleTriggerInput() {
+  noInterrupts();
+  bool pending = triggerPending;
+  uint64_t pulseMicros = triggerPulseMicros;
+  triggerPending = false;
+  interrupts();
+
+  if (!pending) return;
+
+  stopWatch.triggerFinishWithTimestamp(&fs_instance, pulseMicros);
+  Serial.println("[TRIGGER] Finish triggered");
 }
 
 void handleButtonStateMachine(unsigned long currentMillis) {
@@ -166,6 +211,7 @@ void powerDownAndSleep() {
   delay(1000);
 
   detachInterrupt(BUTTON_PIN);
+  detachInterrupt(TRIGGER_PIN);
 
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
@@ -195,6 +241,9 @@ void setup() {
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
+
+  pinMode(TRIGGER_PIN, INPUT_PULLUP);  // backup for the external pull-up, keeps an unplugged input HIGH
+  attachInterrupt(TRIGGER_PIN, handleTriggerInputChange, CHANGE);
 
   pinMode(SYNC_LED_PIN, OUTPUT);
   digitalWrite(SYNC_LED_PIN, LOW);
@@ -269,15 +318,16 @@ void loop() {
   }
 
   handleButtonStateMachine(currentMillis);
+  handleTriggerInput();
 
   if (lora.tryGetPacket(msg, sizeof(msg), len, rssi, snr, rxTs)) {
 
     Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
 
-    if (strncmp(msg, "sync:", 5) == 0) {
+    if (strncmp(msg, "syncreq:", 8) == 0) {
 
-      uint64_t t1 = strtoull(&msg[5], nullptr, 10);
-      if (timeSync.onSyncMsg(t1, rxTs, &stopWatch)) {
+      uint64_t t1 = strtoull(&msg[8], nullptr, 10);
+      if (timeSync.onSyncMsg(t1, rxTs)) {
 
         char ack[32];
         snprintf(ack, sizeof(ack), "syncack:%llu", t1);

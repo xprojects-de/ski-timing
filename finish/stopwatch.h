@@ -19,7 +19,6 @@ public:
   ~StopWatch();
 
   void setOffset(int64_t offset);
-  int64_t getSyncedMicros();
   void triggerStart(uint64_t time);
   void triggerFinish(CFs* fs_instance);
   void triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp);

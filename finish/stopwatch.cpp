@@ -1,6 +1,8 @@
 #include "stopwatch.h"
 
 #define START_TIME_QUEUE_DEPTH 3
+// Normal mode: one finish per racer - legs and trailing poles break the light barrier again within ~0.5 s.
+// Continuous mode is timed by hand on the button, never with the light barrier, so it only filters bounce.
 #define DEBOUNCE_TIME_NORMAL_US 1000000
 #define DEBOUNCE_TIME_CONTINUOUS_US 50000
 
@@ -23,15 +25,14 @@ void StopWatch::setOffset(int64_t offset) {
   _offset = offset;
 }
 
-int64_t StopWatch::getSyncedMicros() {
-  return (int64_t)((int64_t)esp_timer_get_time() + _offset);
-}
-
 void StopWatch::triggerStart(uint64_t time) {
 
   if (_startTimeQueue == NULL) return;
 
-  int64_t startTime = (int64_t)time;
+  // Start-unit µs → finish-local µs, converted once on arrival: "time:" is only accepted while synced, so the
+  // offset is valid now. Everything after this is finish-local, so a later re-sync (start unit rebooted) cannot
+  // turn a racer already on course into a wrong time.
+  int64_t startTime = (int64_t)time - _offset;
 
   if (_isContinuousMode) {
 
@@ -57,20 +58,20 @@ void StopWatch::triggerFinish(CFs* fs_instance) {
 
 void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp) {
 
-  const uint64_t debounceTime = _isContinuousMode ? DEBOUNCE_TIME_CONTINUOUS_US : DEBOUNCE_TIME_NORMAL_US;
+  const int64_t debounceTime = _isContinuousMode ? DEBOUNCE_TIME_CONTINUOUS_US : DEBOUNCE_TIME_NORMAL_US;
 
-  if (_lastFinishTimestamp != 0 && (timestamp - _lastFinishTimestamp) < debounceTime) {
-    Serial.printf("[STOPWATCH] Finish ignored: debounce active (%llu us since last trigger, mode: %s)\n", timestamp - _lastFinishTimestamp, _isContinuousMode ? "continuous" : "normal");
+  // Signed: the button reports on release and the light barrier when the beam is free again, so a finish can
+  // arrive after a later one. Its negative distance must count as "too close", not wrap to a huge value.
+  const int64_t sinceLastFinish = (int64_t)(timestamp - _lastFinishTimestamp);
+
+  if (_lastFinishTimestamp != 0 && sinceLastFinish < debounceTime) {
+    Serial.printf("[STOPWATCH] Finish ignored: debounce active (%lld us since last trigger, mode: %s)\n", sinceLastFinish, _isContinuousMode ? "continuous" : "normal");
     return;
   }
 
   _lastFinishTimestamp = timestamp;
 
-  // Convert the finish-local timestamp into the start device's time domain
-  // by applying the sync offset (same transformation as getSyncedMicros()).
-  // Without this, elapsed = finishLocal - startRemote = garbage when devices
-  // were booted at different times.
-  const int64_t syncedTimestamp = (int64_t)timestamp + _offset;
+  const int64_t finishTime = (int64_t)timestamp;
 
   if (_startTimeQueue == NULL) return;
 
@@ -80,7 +81,7 @@ void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp)
 
     if (xQueuePeek(_startTimeQueue, &startTime, 0) != pdTRUE) {
 
-      if (xQueueSend(_startTimeQueue, &syncedTimestamp, 0) == pdTRUE) {
+      if (xQueueSend(_startTimeQueue, &finishTime, 0) == pdTRUE) {
         Serial.println("[STOPWATCH] Continuous mode: start time set");
       }
       return;
@@ -94,7 +95,7 @@ void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp)
     }
   }
 
-  int64_t elapsed = syncedTimestamp - startTime;
+  int64_t elapsed = finishTime - startTime;
   _lastTime = elapsed / 1000;
 
   fs_instance->append(_lastTime);
@@ -121,7 +122,7 @@ String StopWatch::draw() {
   if (_startTimeQueue != NULL) {
     int64_t oldestStartTime;
     if (xQueuePeek(_startTimeQueue, &oldestStartTime, 0) == pdTRUE) {
-      int64_t currentTime = getSyncedMicros();
+      int64_t currentTime = esp_timer_get_time();
       if (currentTime > oldestStartTime) {
         currentElapsed = (currentTime - oldestStartTime) / 1000;
       }

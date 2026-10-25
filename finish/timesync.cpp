@@ -45,10 +45,10 @@ int64_t Timesync::calculateMedian(int count) {
   }
 }
 
-// ─── Phase 1: finish receives "sync:<t1>" ────────────────────────────────────
+// ─── Phase 1: finish receives "syncreq:<t1>" ─────────────────────────────────
 // Returns true  → caller must send "syncack:<t1>" back to start.
 // Returns false → sender reset detected or already fully synced (no ack needed).
-bool Timesync::onSyncMsg(uint64_t t1, uint64_t rxTimestamp, StopWatch* sw) {
+bool Timesync::onSyncMsg(uint64_t t1, uint64_t rxTimestamp) {
 
   // Detect start-device reboot / counter wrap (t1 jumped backwards)
   if (_lastT1 > 0 && t1 < _lastT1) {
@@ -56,8 +56,8 @@ bool Timesync::onSyncMsg(uint64_t t1, uint64_t rxTimestamp, StopWatch* sw) {
     _pending = { 0, 0, false };
     _samplesCollected = 0;
     _isTimeSynced = false;
-    // Reset stopwatch offset so no stale value is used during re-sync
-    sw->setOffset(0);
+    // The stopwatch offset needs no reset: it is only used to convert a "time:" on arrival, and those are
+    // ignored until the sync is complete again. Starts already queued are finish-local and stay valid.
     for (int i = 0; i < TIMESYNC_SAMPLES; i++) {
       _offsetSamples[i] = 0;
     }
