@@ -73,9 +73,8 @@ timestamps (`time:`) are ignored until sync is complete.
 - **Normal mode**: FIFO queue of up to 3 start times (3 racers on course at once). Each finish
   consumes the oldest start. Finish debounce 1 s.
 - **Continuous mode**: the first trigger sets a single reference start; every following finish
-  records the time since that reference (lap/split style). Debounce 1 s as well (legs and poles
-  break the beam again). Switching modes
-  resets the stopwatch and clears the CSV.
+  records the time since that reference (lap/split style). Debounce 50 ms — timed by hand on the
+  button, never with the light barrier. Switching modes resets the stopwatch and clears the CSV.
 
 ### Button / trigger handling
 `BUTTON_PIN` = GPIO 0, falling-edge ISR captures the µs timestamp; a non-blocking state machine
@@ -89,10 +88,12 @@ in `loop()` interprets the hold duration on release:
 | ≥ 7.5 s, then release | deep sleep (wake on button) | deep sleep (wake on button) |
 
 `TRIGGER_PIN` = GPIO 6 is the external input (start: limit switch, finish: light barrier via optocoupler,
-both active LOW, wiring in [docs/hardware.md](docs/hardware.md)). Its ISR keeps the first falling edge and is
-re-armed only after the input is HIGH again; it **only triggers** — no hold-time functions, so a blocked beam
-cannot discard, switch mode or sleep. Repeats are dropped by the existing lockouts (start: 2 s burst
-cooldown, finish: 1 s stopwatch debounce), shared with the button.
+both active LOW, wiring in [docs/hardware.md](docs/hardware.md)). It **only triggers** — no hold-time
+functions, so an open gate or blocked beam cannot discard, switch mode or sleep. Start: falling-edge ISR keeps
+the first edge, sent once the input is still LOW 10 ms later (the gate stays open; HIGH again = interference),
+re-armed when the gate is closed. Finish: `CHANGE` ISR reports at the rising edge with the falling-edge time
+if the pulse lasted ≥ 1 ms. Repeats are dropped by the existing lockouts (start: 2 s burst cooldown, finish:
+stopwatch debounce), shared with the PRG button, which works unchanged.
 
 ### Finish web interface
 Join WiFi `time-control` (password `time-control`) and open `http://192.168.4.1/`.

@@ -12,6 +12,7 @@
 
 #define BUTTON_PIN 0
 #define TRIGGER_PIN 6  // external light barrier via optocoupler, active LOW like the button (wiring: docs/hardware.md)
+#define TRIGGER_MIN_PULSE_US 1000  // shorter LOW pulses are interference on the cable (a leg in the beam: ~3 ms)
 #define SYNC_LED_PIN 35
 #define HEAP_LOG_INTERVAL_MS 60000  // diagnostic: watch for heap fragmentation over long runtimes
 
@@ -34,11 +35,11 @@ BatteryCheck battery;
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
 
-// Set by the ISR on the first falling edge and only cleared once the beam is free again, so a racer blocking
-// the beam for a while gives one timestamp - the moment the beam was first broken.
-volatile bool triggerInputFired = false;
-volatile uint64_t triggerInputMicros = 0;
-bool triggerInputHandled = false;
+// Trigger input: the ISR reports a pulse at its rising edge, with the time of its falling edge, if it lasted
+// TRIGGER_MIN_PULSE_US. Shorter pulses - interference, bounce while releasing - are ignored.
+volatile uint64_t triggerFallMicros = 0;
+volatile bool triggerPending = false;
+volatile uint64_t triggerPulseMicros = 0;
 
 unsigned long lastDisplayUpdate = 0;
 unsigned long lastHeapLogTime = 0;
@@ -70,10 +71,17 @@ void IRAM_ATTR handleButtonPress() {
   }
 }
 
-void IRAM_ATTR handleTriggerInputFalling() {
-  if (!triggerInputFired) {
-    triggerInputMicros = esp_timer_get_time();
-    triggerInputFired = true;
+void IRAM_ATTR handleTriggerInputChange() {
+  uint64_t now = esp_timer_get_time();
+
+  if (digitalRead(TRIGGER_PIN) == LOW) {
+    triggerFallMicros = now;
+    return;
+  }
+
+  if (!triggerPending && now - triggerFallMicros >= TRIGGER_MIN_PULSE_US) {
+    triggerPulseMicros = triggerFallMicros;
+    triggerPending = true;
   }
 }
 
@@ -98,24 +106,16 @@ void showChipId() {
 // standing in it, snow on the reflector) must not discard a start, switch the mode or put the unit to sleep.
 // A second break by legs or poles is dropped by the stopwatch debounce, shared with the button.
 void handleTriggerInput() {
-  if (!triggerInputFired) return;
+  noInterrupts();
+  bool pending = triggerPending;
+  uint64_t pulseMicros = triggerPulseMicros;
+  triggerPending = false;
+  interrupts();
 
-  if (!triggerInputHandled) {
-    triggerInputHandled = true;
+  if (!pending) return;
 
-    noInterrupts();
-    uint64_t capturedMicros = triggerInputMicros;
-    interrupts();
-
-    stopWatch.triggerFinishWithTimestamp(&fs_instance, capturedMicros);
-    Serial.println("[TRIGGER] Finish triggered");
-    return;
-  }
-
-  if (digitalRead(TRIGGER_PIN) == HIGH) {
-    triggerInputHandled = false;
-    triggerInputFired = false;  // re-arms the ISR
-  }
+  stopWatch.triggerFinishWithTimestamp(&fs_instance, pulseMicros);
+  Serial.println("[TRIGGER] Finish triggered");
 }
 
 void handleButtonStateMachine(unsigned long currentMillis) {
@@ -237,7 +237,7 @@ void setup() {
   attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
 
   pinMode(TRIGGER_PIN, INPUT_PULLUP);  // backup for the external pull-up, keeps an unplugged input HIGH
-  attachInterrupt(TRIGGER_PIN, handleTriggerInputFalling, FALLING);
+  attachInterrupt(TRIGGER_PIN, handleTriggerInputChange, CHANGE);
 
   pinMode(SYNC_LED_PIN, OUTPUT);
   digitalWrite(SYNC_LED_PIN, LOW);

@@ -1,9 +1,10 @@
 #include "stopwatch.h"
 
 #define START_TIME_QUEUE_DEPTH 3
-// One finish per racer in both modes: legs and trailing poles break the light barrier again within ~0.5 s.
-// Two racers closer than this get only one time.
-#define FINISH_DEBOUNCE_US 1000000
+// Normal mode: one finish per racer - legs and trailing poles break the light barrier again within ~0.5 s.
+// Continuous mode is timed by hand on the button, never with the light barrier, so it only filters bounce.
+#define DEBOUNCE_TIME_NORMAL_US 1000000
+#define DEBOUNCE_TIME_CONTINUOUS_US 50000
 
 StopWatch::StopWatch() {
   _lastTime = 0;
@@ -58,7 +59,9 @@ void StopWatch::triggerFinish(CFs* fs_instance) {
 
 void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp) {
 
-  if (_lastFinishTimestamp != 0 && (timestamp - _lastFinishTimestamp) < FINISH_DEBOUNCE_US) {
+  const uint64_t debounceTime = _isContinuousMode ? DEBOUNCE_TIME_CONTINUOUS_US : DEBOUNCE_TIME_NORMAL_US;
+
+  if (_lastFinishTimestamp != 0 && (timestamp - _lastFinishTimestamp) < debounceTime) {
     Serial.printf("[STOPWATCH] Finish ignored: debounce active (%llu us since last trigger, mode: %s)\n", timestamp - _lastFinishTimestamp, _isContinuousMode ? "continuous" : "normal");
     return;
   }

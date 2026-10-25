@@ -38,8 +38,10 @@ endorsements — any compatible LoRa V4 board works the same way:
   It runs on 10–30 V and has a PNP output at that voltage — **never wire it straight to a GPIO**; it goes
   through an optocoupler to **GPIO 6**, see [docs/hardware.md](docs/hardware.md)
 
-Switch and light barrier only trigger: the timestamp is the first edge, a held switch or blocked beam
-gives one trigger, and repeats are dropped (start 2 s, finish 1 s). The PRG button keeps working as
+Switch and light barrier only trigger, the timestamp is always the falling edge. Start: the gate stays
+open, the start is sent once the input is still LOW 10 ms later (shorter = interference) and the input is
+re-armed when the gate is closed. Finish: the finish counts at the end of a beam break of at least 1 ms.
+Repeats are dropped (start 2 s, finish 1 s in normal mode). The PRG button keeps working as
 before, including its hold functions (fall, mode toggle, deep sleep).
 
 GPIO map, wiring of switch and light barrier and the datasheet facts behind them:

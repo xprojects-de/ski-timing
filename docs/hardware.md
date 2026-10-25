@@ -131,8 +131,8 @@ potential-free, so which of 3 / 4 goes to GND does not matter; NC (1–2) stays 
 - **1 kΩ series resistor** at the board limits current from ESD/induced spikes on the cable into the GPIO.
 - NO contact = idle HIGH, pressed LOW. With NC instead, a broken cable would look like a trigger — NO keeps a cut
   cable silent (no false start).
-- **Mechanics**: the lever can rebound when the racer pushes through, giving several closures within tens to
-  hundreds of ms. That is a lockout matter (section 5), not only contact bounce.
+- **Mechanics**: the start gate stays open after the racer passed — the NO contact stays closed, the input LOW,
+  until the gate is closed for the next racer. Section 5 relies on that.
 
 ## 4. Finish: autosen AL012 laser retro-reflective sensor
 
@@ -230,33 +230,50 @@ cell); a separate 12 V battery (isolated as well, but one more battery to charge
 ## 5. Trigger inputs in the firmware
 
 `TRIGGER_PIN` = **GPIO 6** in `start/start.ino` and `finish/finish.ino`, `INPUT_PULLUP` (backup for the external
-pull-up), falling-edge ISR. The PRG button on GPIO 0 is unchanged and keeps all its hold-time functions.
+pull-up). The PRG button on GPIO 0 is unchanged — manual timing works exactly as before, including all hold-time
+functions.
 
-How the input works (same code in both sketches, `handleTriggerInput()`):
+Start and finish use different code, because the devices behave differently: the start gate **stays open** after
+the racer passed (input stays LOW until the gate is closed for the next racer), the light barrier gives a **short
+pulse** (a few ms per leg).
 
-1. **The ISR takes the timestamp of the first falling edge** (`esp_timer_get_time()`) and then ignores every further
-   edge — contact bounce, lever rebound, legs and poles cannot overwrite the moment of first contact / beam break.
-2. `loop()` hands that timestamp to the same function as the button: start → `sendStartTrigger()` (LoRa burst),
-   finish → `StopWatch::triggerFinishWithTimestamp()`. The timestamp comes from the ISR, so the ~18 ms an OLED
-   refresh blocks `loop()` (1 KB over I2C at 500 kHz) delay the handling, not the time.
-3. **Only the trigger function, no hold-time functions.** A beam blocked for seconds (someone standing in it, snow on
-   the reflector) or a switch held down would otherwise discard a start time (1 s), switch the mode and clear all
-   results (4 s) or put the unit to sleep (7.5 s).
-4. The ISR is **re-armed only once the input reads HIGH again** — a long-blocked beam gives exactly one trigger.
-5. **Lockout against double triggers** by the existing lockouts, shared with the button:
-   - start: `BURST_COOLDOWN_MS` = 2 s after a sent start (covers lever rebound);
-   - finish: `FINISH_DEBOUNCE_US` = 1 s in `stopwatch.cpp`, now in **both** modes (continuous was 50 ms — too short
-     for legs and trailing poles; decided 2026-10-25). Two racers less than 1 s apart get only one time.
-   A repeat that is dropped shows in the serial log (`[TRIGGER] Start ignored …` / `[STOPWATCH] Finish ignored …`).
-6. **Deep sleep** detaches the trigger interrupt as well; wake stays on the PRG button only. The light barrier keeps
-   running from USB 5 V while the board sleeps.
-7. **Idle level at boot**: the pull-up keeps an unconnected input HIGH; a pressed switch / blocked beam at boot gives
-   no falling edge, so no trigger. Since the trigger is no longer on GPIO 0, it cannot force the download mode.
+**Start — trigger on the edge, confirmed while the gate is open** (`handleTriggerInput()` in `start.ino`):
 
-Not done on purpose: a minimum pulse width (spike filter). Every falling edge while armed is a trigger. The
-hardware keeps the line clean (stiff 4.7 kΩ pull-up, 1 kΩ series resistor, optocoupler at the finish), and a short
-filter would have to stay below the few ms a leg blocks the beam at speed (**estimate**: 100 km/h ≈ 28 m/s). Add
-one in the ISR (both edges) if the serial log shows triggers nobody caused.
+1. Falling-edge ISR stores the time of the **first** edge and then ignores further edges (bounce).
+2. `TRIGGER_CONFIRM_US` (10 ms) later `loop()` checks the input: still LOW → the start is sent with the edge time;
+   HIGH again → it was interference, nothing is sent.
+3. The ISR is re-armed only when the input is HIGH again — the gate was closed for the next racer.
+4. The 2 s burst cooldown still applies, shared with the button.
+
+**Finish — trigger on release** (`handleTriggerInputChange()` in `finish.ino`):
+
+1. Falling edge → the ISR stores its time.
+2. Rising edge → if the input was LOW for at least `TRIGGER_MIN_PULSE_US` (1 ms), a finish is reported with the
+   stored falling-edge time. Shorter pulses are interference (µs). 1 ms stays below the ~3 ms a leg blocks the beam
+   at 100 km/h (**estimate**). The time comes from the ISR, so a late `loop()` (OLED refresh ≈ 18 ms) does not
+   matter.
+3. Repeats (second leg, poles) are dropped by the stopwatch debounce: 1 s in normal mode. Continuous mode keeps
+   50 ms — it is timed by hand on the button, never with the light barrier (decided 2026-10-25).
+
+Common to both:
+
+- **Only the trigger function, no hold-time functions.** An open gate or a blocked beam must not discard a start
+  time (1 s), switch the mode and clear all results (4 s) or put the unit to sleep (7.5 s).
+- **Deep sleep** detaches the trigger interrupt as well; wake stays on the PRG button only.
+- **Idle level at boot**: the pull-up keeps an unconnected input HIGH. Since the trigger is not on GPIO 0, it cannot
+  force the download mode.
+- Dropped repeats show in the serial log (`[TRIGGER] Start ignored …` / `[STOPWATCH] Finish ignored …`).
+
+Accepted limits, in exchange for little code:
+
+- Start: a gate that closes again within 10 ms of opening is taken as interference (it stays open by design).
+- Finish: a beam blocked for seconds gives its finish only when it is free again (time is still that of the break);
+  closing bounce does not exist behind the optocoupler.
+- Interference longer than the filter (start 10 ms LOW, finish 1 ms) counts as a trigger. The hardware keeps it
+  rare (stiff 4.7 kΩ pull-up, 1 kΩ series resistor, optocoupler at the finish).
+
+The PRG button needs no extra filter: it sits on the board (no cable to pick up interference) and already ignores
+presses shorter than 30 ms (`BTN_MIN_VALID_PRESS_MS`).
 
 ## 6. Open points to check on the board
 
@@ -267,6 +284,7 @@ one in the ISR (both edges) if the serial log shows triggers nobody caused.
   the IDE has `None` / `921600`.
 - ~~Supply for the AL012~~ powerbank + isolated 5 V → 12 V DC-DC from the board's 5V pin (section 4). On the board,
   measure that the 5V pin really carries 5 V with USB connected; check the powerbank for auto-off at low load.
-- ~~Lockout in continuous mode~~ raise to 1 s.
-- On the board: one start per switch contact, one finish per racer (also with poles), nothing on a beam held blocked
-  for > 8 s, deep sleep / wake still on the PRG button only (serial log `[TRIGGER]`, `[STOPWATCH]`).
+- ~~Lockout in continuous mode~~ stays 50 ms: continuous mode is timed by hand, never with the light barrier.
+- On the board: one start per switch contact, one finish per racer (also with poles), a beam held blocked for > 8 s
+  gives one finish on release and no mode switch or sleep, deep sleep / wake still on the PRG button only (serial
+  log `[TRIGGER]`, `[STOPWATCH]`).

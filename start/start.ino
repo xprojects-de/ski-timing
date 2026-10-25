@@ -6,6 +6,7 @@
 
 #define BUTTON_PIN 0
 #define TRIGGER_PIN 6  // external start switch, active LOW like the button (wiring: docs/hardware.md)
+#define TRIGGER_CONFIRM_US 10000  // the gate stays open, so a real start is still LOW after this; interference is not
 #define SYNC_INTERVAL_MS 5000
 #define HEAP_LOG_INTERVAL_MS 60000  // diagnostic: watch for heap fragmentation over long runtimes
 
@@ -21,8 +22,7 @@ BatteryCheck battery;
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
 
-// Set by the ISR on the first falling edge and only cleared once the input is released again, so contact
-// bounce and the lever rebounding cannot overwrite the timestamp of the first contact.
+// Set by the ISR on the first falling edge; cleared once the gate is closed again (input HIGH).
 volatile bool triggerInputFired = false;
 volatile uint64_t triggerInputMicros = 0;
 bool triggerInputHandled = false;
@@ -101,30 +101,33 @@ void sendStartTrigger(uint64_t triggerMicros, unsigned long currentMillis, const
   burstCooldownActive = true;
 }
 
-// The external input only triggers the start - no hold-time functions, a switch held down must not put the
-// unit to sleep. A second contact (bounce, lever rebound) is dropped by the burst cooldown, as for the button.
+// The external input only triggers the start - no hold-time functions, the gate staying open must not put the
+// unit to sleep. The edge time is sent once the input is still LOW TRIGGER_CONFIRM_US later; the ISR is re-armed
+// only when the gate is closed again, so bounce cannot overwrite the time of the first contact.
 void handleTriggerInput(unsigned long currentMillis) {
   if (!triggerInputFired) return;
 
-  if (!triggerInputHandled) {
-    triggerInputHandled = true;
+  noInterrupts();
+  uint64_t edgeMicros = triggerInputMicros;
+  interrupts();
 
-    noInterrupts();
-    uint64_t capturedMicros = triggerInputMicros;
-    interrupts();
+  if (esp_timer_get_time() - edgeMicros < TRIGGER_CONFIRM_US) return;
 
-    if (burstCooldownActive) {
-      Serial.println("[TRIGGER] Start ignored: burst cooldown active");
-      return;
-    }
-    sendStartTrigger(capturedMicros, currentMillis, "TRIGGER");
-    return;
-  }
-
+  // HIGH again: the gate was closed for the next racer - or, if nothing was sent, it was interference
   if (digitalRead(TRIGGER_PIN) == HIGH) {
     triggerInputHandled = false;
     triggerInputFired = false;  // re-arms the ISR
+    return;
   }
+
+  if (triggerInputHandled) return;
+  triggerInputHandled = true;
+
+  if (burstCooldownActive) {
+    Serial.println("[TRIGGER] Start ignored: burst cooldown active");
+    return;
+  }
+  sendStartTrigger(edgeMicros, currentMillis, "TRIGGER");
 }
 
 void handleButtonStateMachine(unsigned long currentMillis) {
