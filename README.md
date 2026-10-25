@@ -34,8 +34,21 @@ endorsements — any compatible LoRa V4 board works the same way:
 - [Roller-lever limit switch, NC+NO, 2-pack](https://www.amazon.de/dp/B09LCL36P2) — trigger switch
   wired to `BUTTON_PIN`, e.g. for the start gate
 - [autosen AL012 laser retro-reflective sensor](https://autosen.com/en/Position-Sensors/Photoelectric-sensors/Laser-sensors/Laser-retro-reflective-sensor-AL012)
-  + [AA966 reflector](https://autosen.com/en/item/322) — laser light barrier at the finish line;
-  its switching output feeds `BUTTON_PIN` the same way the limit switch does
+  + [AA966 reflector](https://autosen.com/en/item/322) — laser light barrier at the finish line.
+  It runs on 10–30 V and has a PNP output at that voltage — **never wire it straight to a GPIO**; it needs an
+  optocoupler, see [docs/hardware.md](docs/hardware.md)
+
+GPIO map, wiring of switch and light barrier and the datasheet facts behind them:
+[docs/hardware.md](docs/hardware.md); datasheets in [docs/datasheets](docs/datasheets/).
+
+### Power supply of the finish unit
+
+Recommended: **one USB powerbank** (≥ 10 000 mAh, without auto-off at low load) powers the board via USB-C. The
+light barrier gets its 12 V from an **isolated DC-DC converter** (5 V → 12 V, 1 W, e.g. Mornsun B0512S-1WR3) fed
+from the board's 5V pin, and its signal goes through an optocoupler — so the sensor side stays galvanically
+isolated from the board. Never connect the 12 V side's 0 V to the board's GND. Wiring, consumption (≈ 0.3 A,
+≈ 15 h on 10 000 mAh, estimated) and race-day caveats (powerbank auto-off, cold, board LiPo hiding a dead
+powerbank): [docs/hardware.md](docs/hardware.md#power-supply-of-the-finish-unit).
 
 ## Setup
 

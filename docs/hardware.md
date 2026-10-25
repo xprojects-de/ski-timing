@@ -133,16 +133,11 @@ Consequences:
 
 1. **The output must never go straight to a GPIO.** Active, it is at the supply voltage minus ≤ 2 V (8–28 V);
    inactive, a PNP output is open, not LOW.
-2. **The sensor needs its own 10–30 V supply.** The board has nothing above 5 V (and 5 V only on USB). Options:
-   a separate 12 V battery, or a boost converter (3.7 V → 12 V) from the board's LiPo. At 35 mA × 12 V the boost
-   draws ≈ 130 mA from the LiPo (**estimate**, 90 % efficiency) — comparable to the finish unit's own draw with
-   the WiFi AP on (170 mA, datasheet 3.4), so it roughly doubles the battery drain.
-   **Decided: boost converter from the board's LiPo** (e.g. MT3608 set to 12 V). Its input goes to the battery side,
-   not to the 3V3 pin (500 mA budget shared with the board). The boost keeps running while the board sleeps unless
-   it is switched off separately.
+2. **The sensor needs its own 10–30 V supply.** The board has nothing above 5 V (and 5 V only on USB) — see
+   [Power supply of the finish unit](#power-supply-of-the-finish-unit) below.
 3. **Mode: dark-on.** The output switches when the beam is interrupted, i.e. when the racer passes. If the sensor
-   loses power or its cable breaks, the output stays off: no false finish, but a silently missed one — the yellow
-   LED shows the sensor works.
+   loses power or its cable breaks, the output stays off: no false finish, but a silently missed one — the green
+   LED shows the sensor has power, the yellow one that it switches.
 
 Recommended interface: an **optocoupler** (e.g. PC817), which converts the PNP output into the same active-LOW
 signal as the button and separates the sensor's supply from the board:
@@ -162,6 +157,55 @@ switch-on delay (constant, irrelevant at the ms resolution of the CSV).
 
 Alternative without isolation: a voltage divider (sized for the highest supply voltage) plus a common ground —
 cheaper, but its level depends on the supply and inverts the logic (active HIGH). Not recommended.
+
+### Power supply of the finish unit
+
+**Recommended (decided 2026-10-25): one USB powerbank for board and light barrier, the sensor side galvanically
+isolated** by an isolated DC-DC converter (power) and the optocoupler above (signal). Sensor, its cable and the
+12 V side then share no conductor with the board; a ground loop or a spike picked up on the sensor cable cannot
+reach the ESP32.
+
+```
+                         board (Heltec V4.2)
+powerbank ══USB-C══════▶ USB-C
+                         J2 pin 2 (5V) ──────┬── +Vin   isolated DC-DC   +Vout (12 V) ── sensor BN (L+)
+                         J2 pin 1 (GND) ─────┴── −Vin   5 V → 12 V, 1 W  0 V ────────── sensor BU (L−)
+                                                        ═══ isolation barrier ═══        │
+                         GPIO 6 ◀── opto transistor ◀═══ opto LED ◀── R ◀── sensor BK (OUT)
+                                                                       opto LED cathode ─┘ (to 0 V)
+```
+
+| Part | Recommendation | Why |
+|---|---|---|
+| Isolated DC-DC | 5 V → 12 V, 1 W, ≥ 1 kV isolation, SIP-7 or SIP-4, e.g. Mornsun B0512S-1WR3, Traco TMA 0512S, Recom R1SE-0512 (**check the chosen part's datasheet** for input/output capacitors) | 12 V × (35 mA sensor + 5 mA opto LED) ≈ 0.5 W → ~50 % load of a 1 W module. Unregulated is fine: the sensor accepts 10–30 V |
+| Feed of the DC-DC | the board's **5V pin** (J2 pin 2, GND J2 pin 1) | Datasheet 3.3: the 5V pin outputs USB 5 V with up to 500 mA. One cable from the powerbank, nothing to split |
+| Optocoupler | PC817 (or similar), LED resistor ≈ 1.8 kΩ at 12 V | see interface above |
+| Powerbank | USB-C, ≥ 10 000 mAh, **no auto-off at low current** ("always on" / "low current" mode) — check before race day | see below |
+
+Rules:
+
+- **Never connect the 12 V side's 0 V to the board's GND** — that removes the isolation.
+- The DC-DC's `+Vin/−Vin` belong to the board side; `+Vout/0 V`, the sensor and the opto LED to the sensor side.
+
+Consumption and runtime (**estimates**): board with WiFi AP ≈ 170 mA (datasheet 3.4) + DC-DC ≈ 0.5 W / 75 %
+efficiency / 5 V ≈ 130 mA → ≈ 0.3 A at 5 V, ≈ 1.5 W. A 10 000 mAh powerbank (≈ 37 Wh, ≈ 25 Wh usable at 5 V)
+lasts ≈ 15 h — a race day with margin. If the board's LiPo is also connected, USB charges it with up to 500 mA
+(datasheet 3.4) on top, until it is full.
+
+Things to know on race day:
+
+- **Powerbank auto-off.** Many powerbanks switch off below a load of roughly 50–100 mA (varies by model, not in
+  any datasheet here). 0.3 A is above that while the board runs; in deep sleep the board draws almost nothing, so
+  the powerbank may switch off — waking then needs the powerbank's button and the PRG button.
+- **LiPo as buffer hides a dead powerbank.** With the board's LiPo connected, the board keeps running on battery
+  when the powerbank goes off, but the 5V pin — and with it the light barrier — goes dead. Dark-on means no false
+  finish, but every finish is missed silently. Either run without the LiPo (the display goes dark with the
+  powerbank — obvious), or watch the sensor's green LED.
+- **Cold.** Li-ion cells lose capacity well below 0 °C; keep the powerbank in an insulated box or inside a jacket
+  and connect it by cable.
+
+Considered and dropped: a boost converter from the board's LiPo (no isolation, doubles the drain on a 3000 mAh
+cell); a separate 12 V battery (isolated as well, but one more battery to charge and a second supply to forget).
 
 ## 5. What this means for the firmware (input for the implementation)
 
@@ -204,8 +248,8 @@ Derived requirements for the trigger inputs:
 - README settings table is behind the IDE (photo 2026-10-25): it lacks *LoRa FEM Type*, *LoRa External FEM Receive
   Gain* (`Disabled`) and *PSRAM* (`Disabled`), and shows *Core Debug Level* `Info` / *Upload Speed* `115200` where
   the IDE has `None` / `921600`.
-- ~~Supply for the AL012~~ boost converter from the LiPo; where exactly to tap the battery on the V4.2 (battery
-  connector vs. a pad) is still open.
+- ~~Supply for the AL012~~ powerbank + isolated 5 V → 12 V DC-DC from the board's 5V pin (section 4). On the board,
+  measure that the 5V pin really carries 5 V with USB connected; check the powerbank for auto-off at low load.
 - ~~Lockout in continuous mode~~ raise to 1 s.
 - Measured contact bounce of the switch and pulse length of the light barrier with a skier passing (serial log once
   the inputs exist).
