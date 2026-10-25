@@ -26,11 +26,11 @@ Each unit needs an **ESP32-S3 "LoRa V4" board** matching the settings in [Arduin
 below (`REGION_EU868` → 868 MHz, the EU band). The links below are just example sources, not
 endorsements — any compatible LoRa V4 board works the same way:
 
-- [ESP32 LoRa V4 board, 2-pack](https://www.amazon.de/dp/B0FSQRQM7D) — base board, enough for the
-  start unit (no GPS needed there)
+- [ESP32 LoRa V4 board, 2-pack](https://www.amazon.de/dp/B0FSQRQM7D) — base board, enough for
+  both units
 - [ESP32 LoRa V4 board + GPS + 3000 mAh battery + case, 2-pack](https://www.amazon.de/dp/B0FS1WQWKF)
-  — the finish unit needs the GPS variant, since only it uses GPS-based time sync
-  ([gpsTime.cpp](finish/gpsTime.cpp))
+  — same board with battery and case; the GPS module is not needed, since the clocks are
+  synchronized over LoRa, not via GPS time
 - [Roller-lever limit switch, NC+NO, 2-pack](https://www.amazon.de/dp/B09LCL36P2) — trigger switch
   wired to `BUTTON_PIN`, e.g. for the start gate
 - [autosen AL012 laser retro-reflective sensor](https://autosen.com/en/Position-Sensors/Photoelectric-sensors/Laser-sensors/Laser-retro-reflective-sensor-AL012)
