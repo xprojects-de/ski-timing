@@ -37,6 +37,8 @@ finish/  finish.ino       main loop: button state machine, LoRa message dispatch
          accesspoint.*    WiFi soft-AP "time-control" at 192.168.4.1
          gpsTime.*        GPS (TinyGPS++) helper — NOT used; time sync is LoRa-only, not GPS
 settings/settings.png     Arduino IDE board settings screenshot
+docs/hardware.md          GPIO map, trigger wiring (start switch, finish light barrier), datasheet facts
+docs/datasheets/          board and sensor datasheets (PDF)
 ```
 
 `display.*` and `batteryCheck.*` are identical in both folders; `lora.*` differs (start: burst
