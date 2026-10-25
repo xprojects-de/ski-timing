@@ -58,10 +58,14 @@ void StopWatch::triggerFinish(CFs* fs_instance) {
 
 void StopWatch::triggerFinishWithTimestamp(CFs* fs_instance, uint64_t timestamp) {
 
-  const uint64_t debounceTime = _isContinuousMode ? DEBOUNCE_TIME_CONTINUOUS_US : DEBOUNCE_TIME_NORMAL_US;
+  const int64_t debounceTime = _isContinuousMode ? DEBOUNCE_TIME_CONTINUOUS_US : DEBOUNCE_TIME_NORMAL_US;
 
-  if (_lastFinishTimestamp != 0 && (timestamp - _lastFinishTimestamp) < debounceTime) {
-    Serial.printf("[STOPWATCH] Finish ignored: debounce active (%llu us since last trigger, mode: %s)\n", timestamp - _lastFinishTimestamp, _isContinuousMode ? "continuous" : "normal");
+  // Signed: the button reports on release and the light barrier when the beam is free again, so a finish can
+  // arrive after a later one. Its negative distance must count as "too close", not wrap to a huge value.
+  const int64_t sinceLastFinish = (int64_t)(timestamp - _lastFinishTimestamp);
+
+  if (_lastFinishTimestamp != 0 && sinceLastFinish < debounceTime) {
+    Serial.printf("[STOPWATCH] Finish ignored: debounce active (%lld us since last trigger, mode: %s)\n", sinceLastFinish, _isContinuousMode ? "continuous" : "normal");
     return;
   }
 
