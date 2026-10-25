@@ -288,3 +288,7 @@ presses shorter than 30 ms (`BTN_MIN_VALID_PRESS_MS`).
 - On the board: one start per switch contact, one finish per racer (also with poles), a beam held blocked for > 8 s
   gives one finish on release and no mode switch or sleep, deep sleep / wake still on the PRG button only (serial
   log `[TRIGGER]`, `[STOPWATCH]`).
+- PRG button bounce (review 2026-10-25, C15, not fixed on purpose): the button ISR is re-armed as soon as `loop()`
+  picks up a press, so a bounce edge on release could overwrite the press time before it is read. Test: press PRG
+  on start and finish at the same moment, hold both ~300 ms, 5–10 times. Times near 0 ms → no issue. Single times
+  around ±300 ms → real; then take the press time into a loop variable when the press is picked up.

@@ -58,6 +58,8 @@ const char index_html[] PROGMEM = R"rawliteral(
         }
 
         function toggleMode() {
+          const target = isContinuous ? "Normal" : "Continuous";
+          if (!confirm("Modus auf " + target + " wechseln?\n\nDabei werden ALLE gespeicherten Zeiten und die Queue gelöscht!")) return;
           const btn = document.getElementById('modeBtn');
           btn.disabled = true;
           const endpoint = isContinuous ? '/disableContinuousMode' : '/enableContinuousMode';
@@ -139,7 +141,8 @@ const char index_html[] PROGMEM = R"rawliteral(
             });
         }
 
-        setInterval(updateTable, 3000);
+        // Auch den Modus: er kann am Gerät (4 s halten) oder von einem anderen Handy gewechselt werden
+        setInterval(() => { updateTable(); fetchStatus(); }, 3000);
         updateTable();
         fetchStatus();
 
