@@ -91,6 +91,15 @@ Routes (all `GET`): `/` UI, `/data` raw CSV, `/status` (`normal`/`continuous`), 
 `/reset`, `/enableContinuousMode`, `/disableContinuousMode`, `/ping`. No authentication — by
 design, see [SECURITY.md](SECURITY.md).
 
+## Reviews
+
+`/ski-timing-code-review` ([.claude/skills/ski-timing-code-review/SKILL.md](.claude/skills/ski-timing-code-review/SKILL.md))
+is a read-only, multi-agent review of the whole current firmware - both sketches, never a diff. It follows
+[.claude/review-base.md](.claude/review-base.md) (no hallucination, no over-optimisation, at most 10 verified
+findings, fix packages with a board test each, report in German) and skips what
+[docs/review/decisions.md](docs/review/decisions.md) lists as accepted. A finding the user accepts as intended is
+added there as an E-entry, never silently dropped. For a diff review use the built-in `/code-review`.
+
 ## Building and testing
 
 - Build/flash only via the **Arduino IDE** (or Arduino CLI) with the ESP32 + Heltec board
