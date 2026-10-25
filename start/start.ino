@@ -5,6 +5,7 @@
 #include <esp_timer.h>
 
 #define BUTTON_PIN 0
+#define TRIGGER_PIN 6  // external start switch, active LOW like the button (wiring: docs/hardware.md)
 #define SYNC_INTERVAL_MS 5000
 #define HEAP_LOG_INTERVAL_MS 60000  // diagnostic: watch for heap fragmentation over long runtimes
 
@@ -19,6 +20,13 @@ BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
+
+// Set by the ISR on the first falling edge and only cleared once the input is released again, so contact
+// bounce and the lever rebounding cannot overwrite the timestamp of the first contact.
+volatile bool triggerInputFired = false;
+volatile uint64_t triggerInputMicros = 0;
+bool triggerInputHandled = false;
+
 const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
 
 enum ButtonState {
@@ -67,11 +75,56 @@ void IRAM_ATTR handleButtonPress() {
   }
 }
 
+void IRAM_ATTR handleTriggerInputFalling() {
+  if (!triggerInputFired) {
+    triggerInputMicros = esp_timer_get_time();
+    triggerInputFired = true;
+  }
+}
+
 void showChipId() {
   uint64_t chipId = ESP.getEfuseMac();
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
   Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+}
+
+void sendStartTrigger(uint64_t triggerMicros, unsigned long currentMillis, const char* logTag) {
+  char startMsg[40];
+  snprintf(startMsg, sizeof(startMsg), "time:%llu", triggerMicros);
+  snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", triggerMicros);
+
+  lora.sendData(startMsg, true);
+  Serial.printf("[%s] Start-Trigger (Burst): %s\n", logTag, startMsg);
+
+  lastBurstTime = currentMillis;
+  burstCooldownActive = true;
+}
+
+// The external input only triggers the start - no hold-time functions, a switch held down must not put the
+// unit to sleep. A second contact (bounce, lever rebound) is dropped by the burst cooldown, as for the button.
+void handleTriggerInput(unsigned long currentMillis) {
+  if (!triggerInputFired) return;
+
+  if (!triggerInputHandled) {
+    triggerInputHandled = true;
+
+    noInterrupts();
+    uint64_t capturedMicros = triggerInputMicros;
+    interrupts();
+
+    if (burstCooldownActive) {
+      Serial.println("[TRIGGER] Start ignored: burst cooldown active");
+      return;
+    }
+    sendStartTrigger(capturedMicros, currentMillis, "TRIGGER");
+    return;
+  }
+
+  if (digitalRead(TRIGGER_PIN) == HIGH) {
+    triggerInputHandled = false;
+    triggerInputFired = false;  // re-arms the ISR
+  }
 }
 
 void handleButtonStateMachine(unsigned long currentMillis) {
@@ -97,15 +150,7 @@ void handleButtonStateMachine(unsigned long currentMillis) {
           uint64_t capturedMicros = buttonPressMicros;
           interrupts();
 
-          char startMsg[40];
-          snprintf(startMsg, sizeof(startMsg), "time:%llu", capturedMicros);
-          snprintf(timeTriggerStr, sizeof(timeTriggerStr), "%llu", capturedMicros);
-
-          lora.sendData(startMsg, true);
-          Serial.printf("[BTN] Start-Trigger (Burst): %s\n", startMsg);
-
-          lastBurstTime = currentMillis;
-          burstCooldownActive = true;
+          sendStartTrigger(capturedMicros, currentMillis, "BTN");
         }
 
         buttonState = BTN_IDLE;
@@ -150,6 +195,7 @@ void powerDownAndSleep() {
   delay(1000);
 
   detachInterrupt(BUTTON_PIN);
+  detachInterrupt(TRIGGER_PIN);
 
   dp.clear();
   dp.display();
@@ -177,6 +223,9 @@ void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
 
+  pinMode(TRIGGER_PIN, INPUT_PULLUP);  // backup for the external pull-up, keeps an unplugged input HIGH
+  attachInterrupt(TRIGGER_PIN, handleTriggerInputFalling, FALLING);
+
   dp.init();
   battery.init();
   battery.startTask();
@@ -196,6 +245,7 @@ void loop() {
   }
 
   handleButtonStateMachine(currentMillis);
+  handleTriggerInput(currentMillis);
 
   if (currentMillis - lastHeapLogTime >= HEAP_LOG_INTERVAL_MS) {
     lastHeapLogTime = currentMillis;

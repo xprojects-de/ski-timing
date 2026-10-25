@@ -11,6 +11,7 @@
 #include <esp_timer.h>
 
 #define BUTTON_PIN 0
+#define TRIGGER_PIN 6  // external light barrier via optocoupler, active LOW like the button (wiring: docs/hardware.md)
 #define SYNC_LED_PIN 35
 #define HEAP_LOG_INTERVAL_MS 60000  // diagnostic: watch for heap fragmentation over long runtimes
 
@@ -32,6 +33,13 @@ BatteryCheck battery;
 
 volatile bool buttonTriggered = false;
 volatile uint64_t buttonPressMicros = 0;
+
+// Set by the ISR on the first falling edge and only cleared once the beam is free again, so a racer blocking
+// the beam for a while gives one timestamp - the moment the beam was first broken.
+volatile bool triggerInputFired = false;
+volatile uint64_t triggerInputMicros = 0;
+bool triggerInputHandled = false;
+
 unsigned long lastDisplayUpdate = 0;
 unsigned long lastHeapLogTime = 0;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 250;
@@ -62,6 +70,13 @@ void IRAM_ATTR handleButtonPress() {
   }
 }
 
+void IRAM_ATTR handleTriggerInputFalling() {
+  if (!triggerInputFired) {
+    triggerInputMicros = esp_timer_get_time();
+    triggerInputFired = true;
+  }
+}
+
 void VextON(void) {
   pinMode(Vext, OUTPUT);
   digitalWrite(Vext, LOW);
@@ -77,6 +92,30 @@ void showChipId() {
   Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
   Serial.printf("This chip has %d cores\n", ESP.getChipCores());
   Serial.printf("ESP32ChipID=%04X%08X\r\n", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+}
+
+// The external input only triggers the finish - no hold-time functions: a beam blocked for seconds (someone
+// standing in it, snow on the reflector) must not discard a start, switch the mode or put the unit to sleep.
+// A second break by legs or poles is dropped by the stopwatch debounce, shared with the button.
+void handleTriggerInput() {
+  if (!triggerInputFired) return;
+
+  if (!triggerInputHandled) {
+    triggerInputHandled = true;
+
+    noInterrupts();
+    uint64_t capturedMicros = triggerInputMicros;
+    interrupts();
+
+    stopWatch.triggerFinishWithTimestamp(&fs_instance, capturedMicros);
+    Serial.println("[TRIGGER] Finish triggered");
+    return;
+  }
+
+  if (digitalRead(TRIGGER_PIN) == HIGH) {
+    triggerInputHandled = false;
+    triggerInputFired = false;  // re-arms the ISR
+  }
 }
 
 void handleButtonStateMachine(unsigned long currentMillis) {
@@ -166,6 +205,7 @@ void powerDownAndSleep() {
   delay(1000);
 
   detachInterrupt(BUTTON_PIN);
+  detachInterrupt(TRIGGER_PIN);
 
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
@@ -195,6 +235,9 @@ void setup() {
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(BUTTON_PIN, handleButtonPress, FALLING);
+
+  pinMode(TRIGGER_PIN, INPUT_PULLUP);  // backup for the external pull-up, keeps an unplugged input HIGH
+  attachInterrupt(TRIGGER_PIN, handleTriggerInputFalling, FALLING);
 
   pinMode(SYNC_LED_PIN, OUTPUT);
   digitalWrite(SYNC_LED_PIN, LOW);
@@ -269,6 +312,7 @@ void loop() {
   }
 
   handleButtonStateMachine(currentMillis);
+  handleTriggerInput();
 
   if (lora.tryGetPacket(msg, sizeof(msg), len, rssi, snr, rxTs)) {
 
