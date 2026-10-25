@@ -45,7 +45,7 @@ int64_t Timesync::calculateMedian(int count) {
   }
 }
 
-// ─── Phase 1: finish receives "sync:<t1>" ────────────────────────────────────
+// ─── Phase 1: finish receives "syncreq:<t1>" ─────────────────────────────────
 // Returns true  → caller must send "syncack:<t1>" back to start.
 // Returns false → sender reset detected or already fully synced (no ack needed).
 bool Timesync::onSyncMsg(uint64_t t1, uint64_t rxTimestamp, StopWatch* sw) {

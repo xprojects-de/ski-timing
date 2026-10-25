@@ -293,7 +293,9 @@ void loop() {
     lastSyncTime = currentMillis;
 
     if (!burstCooldownActive) {
-      snprintf(syncMsg, sizeof(syncMsg), "sync:%llu", (uint64_t)esp_timer_get_time());
+      // Same length as the finish's "syncack:<t1>": halfRtt assumes both legs take the same air time, and at
+      // SF10 a few bytes more can cost one more LoRa block (~65 ms) on one way.
+      snprintf(syncMsg, sizeof(syncMsg), "syncreq:%llu", (uint64_t)esp_timer_get_time());
       lora.sendData(syncMsg);
       Serial.printf("[SYNC] sync sent: %s\n", syncMsg);
     } else {

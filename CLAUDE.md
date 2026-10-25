@@ -56,7 +56,7 @@ timestamp is captured in `OnRxDone` with `esp_timer_get_time()`.
 ### Message protocol (text, after the `ST-` prefix)
 | Message | Direction | Meaning |
 |---|---|---|
-| `sync:<t1>` | start → finish | sync request, `t1` = start-local µs at send (every 5 s) |
+| `syncreq:<t1>` | start → finish | sync request, `t1` = start-local µs at send (every 5 s); same length as `syncack:<t1>` so both legs have the same air time |
 | `syncack:<t1>` | finish → start | echo of `t1`; finish stores its receive time `t2` |
 | `syncfin:<t1>:<halfRtt>` | start → finish | start measured `t4`, sends `halfRtt = (t4 - t1) / 2` |
 | `time:<µs>` | start → finish | start trigger timestamp, sent as a burst of 3 packets |

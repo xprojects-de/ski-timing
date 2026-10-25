@@ -318,9 +318,9 @@ void loop() {
 
     Serial.printf("Receive message: %s | RSSI: %d dBm | SNR: %d dB\n", msg, rssi, snr);
 
-    if (strncmp(msg, "sync:", 5) == 0) {
+    if (strncmp(msg, "syncreq:", 8) == 0) {
 
-      uint64_t t1 = strtoull(&msg[5], nullptr, 10);
+      uint64_t t1 = strtoull(&msg[8], nullptr, 10);
       if (timeSync.onSyncMsg(t1, rxTs, &stopWatch)) {
 
         char ack[32];
