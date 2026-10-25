@@ -321,7 +321,7 @@ void loop() {
     if (strncmp(msg, "syncreq:", 8) == 0) {
 
       uint64_t t1 = strtoull(&msg[8], nullptr, 10);
-      if (timeSync.onSyncMsg(t1, rxTs, &stopWatch)) {
+      if (timeSync.onSyncMsg(t1, rxTs)) {
 
         char ack[32];
         snprintf(ack, sizeof(ack), "syncack:%llu", t1);

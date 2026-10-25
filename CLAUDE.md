@@ -68,8 +68,9 @@ the median becomes the stopwatch offset, the sync LED (pin 35) turns on and the 
 timestamps (`time:`) are ignored until sync is complete.
 
 ### Timing (`finish/stopwatch.cpp`)
-- Finish timestamps are converted into the start unit's time domain (`timestamp + offset`), then
-  `elapsed = synced finish - start`, stored in **milliseconds as integer**.
+- Start timestamps are converted once on arrival into finish-local µs (`start - offset`, valid because
+  `time:` is only accepted while synced); finish timestamps stay finish-local, `elapsed = finish - start`,
+  stored in **milliseconds as integer**. A later re-sync therefore cannot change a racer already on course.
 - **Normal mode**: FIFO queue of up to 3 start times (3 racers on course at once). Each finish
   consumes the oldest start. Finish debounce 1 s.
 - **Continuous mode**: the first trigger sets a single reference start; every following finish
