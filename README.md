@@ -31,15 +31,55 @@ endorsements — any compatible LoRa V4 board works the same way:
 - [ESP32 LoRa V4 board + GPS + 3000 mAh battery + case, 2-pack](https://www.amazon.de/dp/B0FS1WQWKF)
   — same board with battery and case; the GPS module is not needed, since the clocks are
   synchronized over LoRa, not via GPS time
-- [Roller-lever limit switch, NC+NO, 2-pack](https://www.amazon.de/dp/B09LCL36P2) — trigger switch
-  wired to `BUTTON_PIN`, e.g. for the start gate
+- [Roller-lever limit switch, NC+NO, 2-pack](https://www.amazon.de/dp/B09LCL36P2) — start gate switch,
+  NO contact (terminals 3–4) between **GPIO 6** and GND
 - [autosen AL012 laser retro-reflective sensor](https://autosen.com/en/Position-Sensors/Photoelectric-sensors/Laser-sensors/Laser-retro-reflective-sensor-AL012)
   + [AA966 reflector](https://autosen.com/en/item/322) — laser light barrier at the finish line.
-  It runs on 10–30 V and has a PNP output at that voltage — **never wire it straight to a GPIO**; it needs an
-  optocoupler, see [docs/hardware.md](docs/hardware.md)
+  It runs on 10–30 V and has a PNP output at that voltage — **never wire it straight to a GPIO**; it goes
+  through an optocoupler to **GPIO 6**, see [docs/hardware.md](docs/hardware.md)
+
+Switch and light barrier only trigger: the timestamp is the first edge, a held switch or blocked beam
+gives one trigger, and repeats are dropped (start 2 s, finish 1 s). The PRG button keeps working as
+before, including its hold functions (fall, mode toggle, deep sleep).
 
 GPIO map, wiring of switch and light barrier and the datasheet facts behind them:
 [docs/hardware.md](docs/hardware.md); datasheets in [docs/datasheets](docs/datasheets/).
+
+### Wiring
+
+Both units use **GPIO 6** as trigger input. The pins are on the board's two pin headers; the labels are
+printed on the back of the PCB. Header J3 reads `7 6 5 4 3 2 1 38 … 46 37 3V3 3V3 GND` — **GPIO 6 is the
+second pin from the `7` end**, 3V3 and GND are at the other end of the same header. Header J2 starts with
+`GND 5V Ve Ve …`.
+
+**Start unit** — limit switch, NO contact (terminals 3–4 on the switch label):
+
+| Board pin (label) | Header pin | Connect to |
+|---|---|---|
+| `6` | J3 pin 17 | 1 kΩ resistor → switch terminal 4 |
+| `3V3` | J3 pin 2 | 4.7 kΩ pull-up → switch terminal 4 (the switch side of the 1 kΩ) |
+| `GND` | J3 pin 1 | switch terminal 3 |
+
+**Finish unit** — light barrier via isolated DC-DC and optocoupler (e.g. PC817):
+
+| Board pin (label) | Header pin | Connect to |
+|---|---|---|
+| `6` | J3 pin 17 | 1 kΩ resistor → optocoupler collector |
+| `3V3` | J3 pin 2 | 4.7 kΩ pull-up → optocoupler collector (the opto side of the 1 kΩ) |
+| `GND` | J3 pin 1 | optocoupler emitter |
+| `5V` | J2 pin 2 | DC-DC +Vin |
+| `GND` | J2 pin 1 | DC-DC −Vin |
+
+Sensor side — **not connected to the board's GND**:
+
+| From | To |
+|---|---|
+| DC-DC +Vout (12 V) | sensor pin 1, brown (L+) |
+| DC-DC 0 V | sensor pin 3, blue (L−) and optocoupler LED cathode |
+| sensor pin 4, black (OUT) | 1.8 kΩ resistor → optocoupler LED anode |
+
+Set the light barrier to **dark-on** (output switches when the beam is interrupted). Never connect the
+sensor's output or its 12 V directly to a board pin — GPIOs take 3.3 V at most.
 
 ### Power supply of the finish unit
 

@@ -12,6 +12,26 @@ Datasheets in [datasheets/](datasheets/):
 | autosen AL012 laser retro-reflective sensor | `Laser retro-reflective sensor-AL012.pdf` | autosen.com |
 | QWORK roller-lever limit switch | — (no datasheet, only the Amazon listing) | amazon.de/dp/B09LCL36P2 |
 
+## Wiring at a glance
+
+Trigger input on both units: **GPIO 6** = header J3 pin 17, labelled `6` on the back of the PCB, second pin from
+the `7` end of the header (sections 2–4 explain why and show the circuits).
+
+| Unit | Board pin (label, header) | Connect to |
+|---|---|---|
+| Start | `6` (J3 pin 17) | 1 kΩ → limit switch terminal 4 |
+| Start | `3V3` (J3 pin 2) | 4.7 kΩ pull-up → limit switch terminal 4 |
+| Start | `GND` (J3 pin 1) | limit switch terminal 3 |
+| Finish | `6` (J3 pin 17) | 1 kΩ → optocoupler collector |
+| Finish | `3V3` (J3 pin 2) | 4.7 kΩ pull-up → optocoupler collector |
+| Finish | `GND` (J3 pin 1) | optocoupler emitter |
+| Finish | `5V` (J2 pin 2) | isolated DC-DC +Vin |
+| Finish | `GND` (J2 pin 1) | isolated DC-DC −Vin |
+
+Finish, sensor side (galvanically isolated, **no connection to the board's GND**): DC-DC +Vout (12 V) → sensor
+pin 1 brown (L+); DC-DC 0 V → sensor pin 3 blue (L−) and optocoupler LED cathode; sensor pin 4 black (OUT) →
+1.8 kΩ → optocoupler LED anode. Sensor mode: dark-on.
+
 ## 1. Board: Heltec WiFi LoRa 32 V4
 
 | Item | Value | Source |
@@ -207,39 +227,36 @@ Things to know on race day:
 Considered and dropped: a boost converter from the board's LiPo (no isolation, doubles the drain on a 3000 mAh
 cell); a separate 12 V battery (isolated as well, but one more battery to charge and a second supply to forget).
 
-## 5. What this means for the firmware (input for the implementation)
+## 5. Trigger inputs in the firmware
 
-Facts from the code:
+`TRIGGER_PIN` = **GPIO 6** in `start/start.ino` and `finish/finish.ino`, `INPUT_PULLUP` (backup for the external
+pull-up), falling-edge ISR. The PRG button on GPIO 0 is unchanged and keeps all its hold-time functions.
 
-- `BUTTON_PIN` is GPIO 0; its ISR captures `esp_timer_get_time()` on the falling edge; the state machine in
-  `loop()` judges the **hold duration on release**: ≥ 30 ms trigger, ≥ 1 s fall, ≥ 4 s mode toggle (clears the CSV),
-  ≥ 7.5 s deep sleep.
-- The main loop can be blocked for a while: one OLED refresh sends 1 KB over I2C at 500 kHz (`display.cpp`), i.e.
-  ≈ 18 ms every 250 ms; flash writes come on top.
-- Start: after a trigger, `BURST_COOLDOWN_MS` (2 s) blocks the next one.
-- Finish: `StopWatch::triggerFinishWithTimestamp` ignores a finish within 1 s (normal) / 50 ms (continuous) of the
-  last accepted one — for every caller, so button and light barrier share it.
+How the input works (same code in both sketches, `handleTriggerInput()`):
 
-Derived requirements for the trigger inputs:
+1. **The ISR takes the timestamp of the first falling edge** (`esp_timer_get_time()`) and then ignores every further
+   edge — contact bounce, lever rebound, legs and poles cannot overwrite the moment of first contact / beam break.
+2. `loop()` hands that timestamp to the same function as the button: start → `sendStartTrigger()` (LoRa burst),
+   finish → `StopWatch::triggerFinishWithTimestamp()`. The timestamp comes from the ISR, so the ~18 ms an OLED
+   refresh blocks `loop()` (1 KB over I2C at 500 kHz) delay the handling, not the time.
+3. **Only the trigger function, no hold-time functions.** A beam blocked for seconds (someone standing in it, snow on
+   the reflector) or a switch held down would otherwise discard a start time (1 s), switch the mode and clear all
+   results (4 s) or put the unit to sleep (7.5 s).
+4. The ISR is **re-armed only once the input reads HIGH again** — a long-blocked beam gives exactly one trigger.
+5. **Lockout against double triggers** by the existing lockouts, shared with the button:
+   - start: `BURST_COOLDOWN_MS` = 2 s after a sent start (covers lever rebound);
+   - finish: `FINISH_DEBOUNCE_US` = 1 s in `stopwatch.cpp`, now in **both** modes (continuous was 50 ms — too short
+     for legs and trailing poles; decided 2026-10-25). Two racers less than 1 s apart get only one time.
+   A repeat that is dropped shows in the serial log (`[TRIGGER] Start ignored …` / `[STOPWATCH] Finish ignored …`).
+6. **Deep sleep** detaches the trigger interrupt as well; wake stays on the PRG button only. The light barrier keeps
+   running from USB 5 V while the board sleeps.
+7. **Idle level at boot**: the pull-up keeps an unconnected input HIGH; a pressed switch / blocked beam at boot gives
+   no falling edge, so no trigger. Since the trigger is no longer on GPIO 0, it cannot force the download mode.
 
-1. **Only the trigger function, no hold-time functions.** A beam blocked for 1 s (someone standing in it, snow on the
-   reflector) would otherwise discard a start time, at 4 s switch mode and clear all results, at 7.5 s put the finish
-   unit to sleep. Same for a start switch held down.
-2. **Timestamp from the ISR edge**, as with the button — the first edge is the moment of contact / beam break; later
-   bounce edges must not overwrite it.
-3. **Short pulses are real.** A racer at 100 km/h (≈ 28 m/s) blocks the 6 mm beam for only a few ms with a leg or
-   ski boot (**estimate**). A minimum-length check must therefore be short (≈ 1 ms range) and must not rely on
-   `loop()` sampling the pin, which can be ~20 ms late. Measuring the pulse width in the ISR (both edges) avoids that.
-4. **Lockout against double triggers** after an accepted trigger: start — the existing 2 s cooldown (covers lever
-   rebound); finish normal — the existing 1 s (covers legs and trailing poles); finish continuous — 50 ms is too short for poles
-   and the second leg; **decided 2026-10-25: raise it to 1 s** like normal mode (two racers less than 1 s apart then
-   get only one time).
-5. **Own volatile variables per input** (ISR flag + 64-bit timestamp, read inside `noInterrupts()`), not shared with
-   the button ISR.
-6. **Deep sleep**: detach the new interrupt as well; wake stays on the PRG button only. The light barrier keeps
-   drawing from its own supply while the board sleeps.
-7. **Idle level at boot**: pull-up keeps an unconnected input HIGH; a pressed switch / blocked beam at boot gives no
-   falling edge, so no trigger.
+Not done on purpose: a minimum pulse width (spike filter). Every falling edge while armed is a trigger. The
+hardware keeps the line clean (stiff 4.7 kΩ pull-up, 1 kΩ series resistor, optocoupler at the finish), and a short
+filter would have to stay below the few ms a leg blocks the beam at speed (**estimate**: 100 km/h ≈ 28 m/s). Add
+one in the ISR (both edges) if the serial log shows triggers nobody caused.
 
 ## 6. Open points to check on the board
 
@@ -251,5 +268,5 @@ Derived requirements for the trigger inputs:
 - ~~Supply for the AL012~~ powerbank + isolated 5 V → 12 V DC-DC from the board's 5V pin (section 4). On the board,
   measure that the 5V pin really carries 5 V with USB connected; check the powerbank for auto-off at low load.
 - ~~Lockout in continuous mode~~ raise to 1 s.
-- Measured contact bounce of the switch and pulse length of the light barrier with a skier passing (serial log once
-  the inputs exist).
+- On the board: one start per switch contact, one finish per racer (also with poles), nothing on a beam held blocked
+  for > 8 s, deep sleep / wake still on the PRG button only (serial log `[TRIGGER]`, `[STOPWATCH]`).

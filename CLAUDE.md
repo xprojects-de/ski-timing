@@ -23,11 +23,11 @@ Two independent Arduino sketches; each folder is opened and flashed on its own i
 There is no shared library folder — common modules are **duplicated** in both sketches.
 
 ```
-start/   start.ino        main loop: button state machine, sync initiator, display
+start/   start.ino        main loop: button state machine, trigger input, sync initiator, display
          lora.*           LoRa radio wrapper (FreeRTOS task + TX/RX queues), burst sending
          display.*        thin wrapper around the Heltec SSD1306 OLED
          batteryCheck.*   battery voltage/percentage in a background FreeRTOS task
-finish/  finish.ino       main loop: button state machine, LoRa message dispatch, display, sync LED
+finish/  finish.ino       main loop: button state machine, trigger input, LoRa message dispatch, display, sync LED
          lora.*           same as start, plus duplicate filtering of burst `time:` packets
          timesync.*       RTT-based clock offset estimation (median of 15 samples)
          stopwatch.*      start-time queue, elapsed-time calculation, normal/continuous mode
@@ -73,7 +73,8 @@ timestamps (`time:`) are ignored until sync is complete.
 - **Normal mode**: FIFO queue of up to 3 start times (3 racers on course at once). Each finish
   consumes the oldest start. Finish debounce 1 s.
 - **Continuous mode**: the first trigger sets a single reference start; every following finish
-  records the time since that reference (lap/split style). Debounce 50 ms. Switching modes
+  records the time since that reference (lap/split style). Debounce 1 s as well (legs and poles
+  break the beam again). Switching modes
   resets the stopwatch and clears the CSV.
 
 ### Button / trigger handling
@@ -86,6 +87,12 @@ in `loop()` interprets the hold duration on release:
 | ≥ 1 s | — | "fall": discard oldest start time (normal mode only) |
 | ≥ 4 s | — | toggle normal/continuous mode (clears times) |
 | ≥ 7.5 s, then release | deep sleep (wake on button) | deep sleep (wake on button) |
+
+`TRIGGER_PIN` = GPIO 6 is the external input (start: limit switch, finish: light barrier via optocoupler,
+both active LOW, wiring in [docs/hardware.md](docs/hardware.md)). Its ISR keeps the first falling edge and is
+re-armed only after the input is HIGH again; it **only triggers** — no hold-time functions, so a blocked beam
+cannot discard, switch mode or sleep. Repeats are dropped by the existing lockouts (start: 2 s burst
+cooldown, finish: 1 s stopwatch debounce), shared with the button.
 
 ### Finish web interface
 Join WiFi `time-control` (password `time-control`) and open `http://192.168.4.1/`.
