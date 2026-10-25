@@ -37,7 +37,7 @@ volatile uint64_t buttonPressMicros = 0;
 
 // Trigger input: the ISR reports a pulse at its rising edge, with the time of its falling edge, if it lasted
 // TRIGGER_MIN_PULSE_US. Shorter pulses - interference, bounce while releasing - are ignored.
-volatile uint64_t triggerFallMicros = 0;
+volatile uint64_t triggerFallMicros = 0;  // 0 = no falling edge seen since the last rising edge
 volatile bool triggerPending = false;
 volatile uint64_t triggerPulseMicros = 0;
 
@@ -79,8 +79,14 @@ void IRAM_ATTR handleTriggerInputChange() {
     return;
   }
 
-  if (!triggerPending && now - triggerFallMicros >= TRIGGER_MIN_PULSE_US) {
-    triggerPulseMicros = triggerFallMicros;
+  // A spike shorter than the ISR latency is already HIGH again when read and arrives here without its fall -
+  // it must not be reported with the fall time of an earlier pulse.
+  uint64_t fallMicros = triggerFallMicros;
+  triggerFallMicros = 0;
+  if (fallMicros == 0) return;
+
+  if (!triggerPending && now - fallMicros >= TRIGGER_MIN_PULSE_US) {
+    triggerPulseMicros = fallMicros;
     triggerPending = true;
   }
 }
